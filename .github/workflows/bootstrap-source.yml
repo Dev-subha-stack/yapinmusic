@@ -3,16 +3,12 @@ name: Bootstrap Yapin Music source
 on:
   push:
     branches: [main]
-    paths:
-      - ".yapin-source/**"
-      - ".github/workflows/bootstrap-source.yml"
 
 permissions:
   contents: write
 
 jobs:
   bootstrap:
-    if: ${{ github.event.head_commit.message == 'chore: stage Yapin Music source archive' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out main
