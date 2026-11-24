@@ -1,0 +1,632 @@
+import { BANDS } from '../data/music.js';
+import { TEAM } from '../data/team.js';
+import { storage as ls } from '../services/storage.js';
+import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
+
+(function () {
+  'use strict';
+  var ICON = '/assets/brand-icon.webp';
+
+  /* ============ EASY TO EDIT: TEAM ============ */
+  // Replace names and handles. For a custom photo add avatar: "data:image/..." to a member.
+  /* Music catalog is imported from src/data/music.js. */
+
+  /* ============ HELPERS ============ */
+
+  var NEED = 3;
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  /* ============ THEME ============ */
+  var themeButton = $('#theme-toggle');
+  var themeMode = ls.get('yapin:theme');
+  if (themeMode !== 'dark' && themeMode !== 'light') themeMode = 'system';
+  var themeMedia = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function systemIsDark() { return !!(themeMedia && themeMedia.matches); }
+  function applyTheme() {
+    var dark = themeMode === 'dark' || (themeMode === 'system' && systemIsDark());
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    if (themeButton) {
+      themeButton.setAttribute('aria-pressed', String(dark));
+      themeButton.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+      var icon = $('[data-theme-icon]', themeButton);
+      var label = $('[data-theme-label]', themeButton);
+      if (icon) icon.textContent = dark ? '☀' : '☾';
+      if (label) label.textContent = dark ? 'Light mode' : 'Dark mode';
+    }
+    var themeColor = $('meta[name="theme-color"]');
+    if (themeColor) themeColor.setAttribute('content', dark ? '#1C1014' : '#FF6B35');
+  }
+  applyTheme();
+  if (themeButton) themeButton.addEventListener('click', function () {
+    var currentlyDark = themeMode === 'dark' || (themeMode === 'system' && systemIsDark());
+    themeMode = currentlyDark ? 'light' : 'dark';
+    ls.set('yapin:theme', themeMode);
+    applyTheme();
+  });
+  if (themeMedia) {
+    if (themeMedia.addEventListener) themeMedia.addEventListener('change', function () { if (themeMode === 'system') applyTheme(); });
+    else if (themeMedia.addListener) themeMedia.addListener(function () { if (themeMode === 'system') applyTheme(); });
+  }
+  function dayNumber() {
+    var d = new Date();
+    return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 0, 1)) / 864e5) + 1;
+  }
+  function mulberry(seed) {
+    return function () {
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function shuffledOrder(n, seed) {
+    var a = [], i, r = mulberry(seed);
+    for (i = 0; i < n; i++) a.push(i);
+    for (i = n - 1; i > 0; i--) { var j = Math.floor(r() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 2200);
+  }
+
+  // Flat song catalog
+  var SONGS = [];
+  BANDS.forEach(function (b, bi) {
+    b.s.forEach(function (s, si) { SONGS.push({ id: bi + ':' + si, b: bi, i: si, t: s[0], y: s[1], a: s[2], k: key(s[0]) }); });
+    b.k = bandKey(b.n);
+  });
+  function songById(id) { for (var i = 0; i < SONGS.length; i++) if (SONGS[i].id === id) return SONGS[i]; return null; }
+
+  // Autocomplete: items = [{label, k, ref}], onSubmit(itemOrNull, typedText)
+  function mkCombo(input, list, items, qNorm, onSubmit) {
+    var cur = [], act = -1;
+    function hide() { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); act = -1; }
+    function setAct(i) {
+      act = (i + cur.length) % cur.length;
+      Array.prototype.forEach.call(list.children, function (li, n) { li.setAttribute('aria-selected', String(n === act)); });
+      input.setAttribute('aria-activedescendant', list.id + '-o' + act);
+    }
+    function render() {
+      var q = qNorm(input.value);
+      list.innerHTML = ''; cur = []; act = -1;
+      if (q.length < 2) { hide(); return; }
+      var starts = [], inc = [];
+      items.forEach(function (it) { var p = it.k.indexOf(q); if (p === 0) starts.push(it); else if (p > 0) inc.push(it); });
+      cur = starts.concat(inc).slice(0, 7);
+      if (!cur.length) { hide(); return; }
+      cur.forEach(function (it, i) {
+        var li = el('li', null, it.label); li.setAttribute('role', 'option'); li.id = list.id + '-o' + i; li.setAttribute('aria-selected', 'false');
+        li.addEventListener('pointerdown', function (e) { e.preventDefault(); input.value = ''; hide(); onSubmit(it, it.label); });
+        list.appendChild(li);
+      });
+      list.hidden = false; input.setAttribute('aria-expanded', 'true');
+    }
+    input.addEventListener('input', render);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' && cur.length && !list.hidden) { e.preventDefault(); setAct(act + 1); }
+      else if (e.key === 'ArrowUp' && cur.length && !list.hidden) { e.preventDefault(); setAct(act - 1); }
+      else if (e.key === 'Escape') { hide(); }
+      else if (e.key === 'Enter' && !list.hidden && act >= 0) { e.preventDefault(); var it = cur[act]; input.value = ''; hide(); onSubmit(it, it.label); }
+    });
+    input.addEventListener('blur', function () { setTimeout(hide, 150); });
+    return {
+      submitTyped: function () { var t = input.value; if (!t.trim()) return; input.value = ''; hide(); onSubmit(null, t); },
+      hide: hide
+    };
+  }
+
+  function guessForm(id, placeholder) {
+    return '<form class="guess" autocomplete="off" data-form>' +
+      '<div class="combo"><input id="in-' + id + '" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="lb-' + id + '" aria-label="' + placeholder + '" placeholder="' + placeholder + '" autocapitalize="off" autocorrect="off" spellcheck="false" data-input>' +
+      '<ul id="lb-' + id + '" role="listbox" hidden data-list></ul></div>' +
+      '<button class="btn primary" type="submit" data-go>Guess</button></form>';
+  }
+
+  // Stats
+  function statsGet(k) { return ls.get(k) || { played: 0, wins: 0, streak: 0, best: 0, lastWin: 0 }; }
+  function statsRender(box, k) {
+    var st = statsGet(k); box.innerHTML = '';
+    [['Played', st.played], ['Wins', st.wins], ['Streak', st.streak], ['Best', st.best]].forEach(function (p) {
+      var d = el('div'); d.appendChild(el('dt', null, p[0])); d.appendChild(el('dd', null, String(p[1]))); box.appendChild(d);
+    });
+  }
+  function statsFinish(k, won, day) {
+    var st = statsGet(k); st.played++;
+    if (won) { st.wins++; st.streak = (st.lastWin === day - 1) ? st.streak + 1 : 1; st.best = Math.max(st.best, st.streak); st.lastWin = day; }
+    else st.streak = 0;
+    ls.set(k, st);
+  }
+
+  function copyShare(resultEl, text) {
+    var fallback = function () {
+      var ta = el('textarea'); ta.readOnly = true; ta.value = text; ta.setAttribute('aria-label', 'Result to copy');
+      resultEl.appendChild(ta); ta.focus(); ta.select(); toast('Select the text and copy it.');
+    };
+    try { navigator.clipboard.writeText(text).then(function () { toast('Result copied!'); }, fallback); } catch (e) { fallback(); }
+  }
+
+  var games = {}, active = null;
+  var day = dayNumber();
+
+  /* ============ DIFFICULTY ============ */
+
+  var DIFFS = ['easy', 'medium', 'hard'];
+  var DIFF_NAME = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+  var SONG_LIVES = { easy: 8, medium: 6, hard: 4 };
+  var BAND_TRIES = { easy: 9, medium: 7, hard: 5 };
+  // Fame tiers: 1 = very famous, 2 = well known, 3 = deeper cuts. Easy uses only tier 1 bands and their top hits.
+  var T1 = ['Queen','Nirvana','Metallica','Coldplay','The Beatles','Led Zeppelin',"Guns N' Roses",'AC/DC','Linkin Park','Green Day','ABBA','Pink Floyd','Imagine Dragons','Maroon 5','Red Hot Chili Peppers','Oasis'];
+  var T3 = ['Ramones','The Clash','The Cure','Depeche Mode','Roxette','Journey','Scorpions','Gorillaz','Muse','Los Hermanos','Titãs','Sepultura','Paramore','Radiohead'];
+  var POOL_TIERS = { easy: [1], medium: [1, 2], hard: [2, 3] };
+  var SONG_MAXIDX = { easy: 1, medium: 3, hard: 99 };
+  function tierOf(b) { return T1.indexOf(b.n) >= 0 ? 1 : (T3.indexOf(b.n) >= 0 ? 3 : 2); }
+  function bandPool(d) { var out = []; BANDS.forEach(function (b, i) { if (POOL_TIERS[d].indexOf(tierOf(b)) >= 0) out.push(i); }); return out; }
+  function songPool(d) { return SONGS.filter(function (s) { return POOL_TIERS[d].indexOf(tierOf(BANDS[s.b])) >= 0 && s.i <= SONG_MAXIDX[d]; }); }
+  var diffPref = ls.get('yapin:diff') || {};
+  function getDiff(g) { return DIFFS.indexOf(diffPref[g]) >= 0 ? diffPref[g] : 'medium'; }
+  function setDiffPref(g, d) { diffPref[g] = d; ls.set('yapin:diff', diffPref); }
+  function diffBarHtml() {
+    return '<div class="diffbar"><div class="seg" role="group" aria-label="Difficulty">' +
+      DIFFS.map(function (d) { return '<button type="button" data-diff="' + d + '" aria-pressed="false">' + DIFF_NAME[d] + '</button>'; }).join('') +
+      '</div><p class="diffnote" data-diffnote></p></div>';
+  }
+
+  /* ============ GAME 1: GUESS THE SONG (band -> 3 hits) ============ */
+
+  function gameSong() {
+    var root = document.getElementById('v-song');
+    var HINT_CAP = 9, orders = {};
+    var S = { mode: 'daily', diff: getDiff('song'), bi: 0, guesses: [], done: false, won: false, counted: false, hints: 0 };
+    var NOTES = {
+      easy: '8 lives · the most famous bands · free hint button',
+      medium: '6 lives · well-known bands · hint button costs 1 life',
+      hard: '4 lives · deeper cuts · less info about the band'
+    };
+    function orderFor(d) { if (!orders[d]) orders[d] = shuffledOrder(bandPool(d).length, 20260 + DIFFS.indexOf(d)); return orders[d]; }
+    function lives() { return SONG_LIVES[S.diff]; }
+    // On Medium each hint-button use costs one life; on Easy it is free; Hard has no button.
+    function spent() { return misses().length + (S.diff === 'medium' ? S.hints : 0); }
+    function canHint() { return S.diff === 'easy' || (S.diff === 'medium' && lives() - spent() > 1); }
+    // Medium keeps the original storage keys so earlier progress and stats survive.
+    function sKey() { return 'yapin:song:stats' + (S.diff === 'medium' ? '' : ':' + S.diff); }
+    function sk() { return 'yapin:song:daily:' + day + (S.diff === 'medium' ? '' : ':' + S.diff); }
+
+    root.innerHTML =
+      '<div class="game">' +
+        '<div class="game-head"><div><h1>Guess the Song</h1><p class="lede">We name the band. You name three of its biggest hits before you run out of lives.</p></div>' +
+          '<div class="seg" role="group" aria-label="Game mode"><button type="button" data-mode="daily" aria-pressed="true">Daily</button><button type="button" data-mode="random" aria-pressed="false">Random</button></div></div>' +
+        diffBarHtml() +
+        '<p class="meta" data-meta></p>' +
+        '<div class="target" data-target></div>' +
+        '<div class="status"><span class="count" data-count></span><span class="lives" data-lives aria-label="Lives left"></span></div>' +
+        '<div class="slots" data-slots></div>' +
+        '<div class="clue" data-clue></div>' +
+        '<div class="wrongs" data-wrongs></div>' +
+        guessForm('song', 'Type a song title…') +
+        '<div class="result" data-result hidden></div>' +
+        '<div class="game-actions"><button type="button" class="btn" data-hint>Give me a hint</button><button type="button" class="btn" data-new hidden>New random band</button></div>' +
+        '<p class="meta" data-statlbl></p>' +
+        '<dl class="stats" data-stats></dl>' +
+      '</div>';
+    var meta = $('[data-meta]', root), target = $('[data-target]', root), count = $('[data-count]', root), livesEl = $('[data-lives]', root);
+    var slots = $('[data-slots]', root), clue = $('[data-clue]', root), wrongs = $('[data-wrongs]', root), form = $('[data-form]', root);
+    var input = $('[data-input]', root), list = $('[data-list]', root), go = $('[data-go]', root), resultEl = $('[data-result]', root), newBtn = $('[data-new]', root), statsEl = $('[data-stats]', root);
+    var statLbl = $('[data-statlbl]', root), diffNote = $('[data-diffnote]', root);
+
+    var items = SONGS.map(function (s) { return { label: s.t, k: s.k, song: s }; });
+    var hintBtn = $('[data-hint]', root);
+    hintBtn.addEventListener('click', function () {
+      if (S.done || !canHint() || hintCount() >= HINT_CAP) return;
+      S.hints++; save(); render();
+    });
+    var combo = mkCombo(input, list, items, key, function (it, typed) { submit(it ? it.song : lookup(typed, SONGS, function (s) { return s.k; }, key)); });
+    form.addEventListener('submit', function (e) { e.preventDefault(); combo.submitTyped(); });
+
+    function save() { if (S.mode === 'daily') ls.set(sk(), { g: S.guesses.map(function (g) { return g.id; }), counted: S.counted, h: S.hints }); }
+    function band() { return BANDS[S.bi]; }
+    function found() { return S.guesses.filter(function (g) { return g.ok; }); }
+    function misses() { return S.guesses.filter(function (g) { return !g.ok; }); }
+
+    function start(mode) {
+      S.mode = mode;
+      var bp = bandPool(S.diff);
+      if (mode === 'daily') { var ord = orderFor(S.diff); S.bi = bp[ord[(day - 1) % ord.length]]; }
+      else { var n; do { n = bp[Math.floor(Math.random() * bp.length)]; } while (n === S.bi && bp.length > 1); S.bi = n; }
+      S.guesses = []; S.done = false; S.won = false; S.counted = false; S.hints = 0;
+      if (mode === 'daily') {
+        var saved = ls.get(sk());
+        if (saved && Array.isArray(saved.g)) {
+          saved.g.forEach(function (id) { var s = songById(id); if (s && !S.guesses.some(function (g) { return g.id === id; })) S.guesses.push({ id: id, ok: s.b === S.bi }); });
+          S.hints = S.diff === 'hard' ? 0 : Math.min(HINT_CAP, saved.h | 0);
+          S.counted = !!saved.counted;
+        }
+      }
+      if (found().length >= NEED) { S.done = true; S.won = true; }
+      else if (spent() >= lives()) { S.done = true; S.won = false; }
+      $('[data-mode="daily"]', root).setAttribute('aria-pressed', String(mode === 'daily'));
+      $('[data-mode="random"]', root).setAttribute('aria-pressed', String(mode === 'random'));
+      root.querySelectorAll('[data-diff]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.diff === S.diff)); });
+      diffNote.textContent = NOTES[S.diff] + ' · every miss unlocks a hint';
+      statLbl.textContent = 'Your stats · ' + DIFF_NAME[S.diff];
+      resultEl.hidden = true;
+      render(); statsRender(statsEl, sKey());
+      if (S.done) showResult();
+    }
+
+    function render() {
+      var b = band();
+      meta.textContent = (S.mode === 'daily' ? 'Daily puzzle #' + day : 'Random round') + ' · ' + DIFF_NAME[S.diff];
+      target.innerHTML = '';
+      target.appendChild(el('div', 'lbl', 'Name ' + NEED + ' hits by'));
+      target.appendChild(el('div', 'big', b.n));
+      if (S.diff === 'hard') {
+        target.appendChild(el('div', 'info', 'From ' + b.c));
+      } else {
+        target.appendChild(el('div', 'info', 'Formed ' + b.y + ' · ' + b.c + ' · ' + b.g));
+        var ys = b.s.map(function (s) { return s[1]; });
+        target.appendChild(el('div', 'info', 'Their big hits came out between ' + Math.min.apply(null, ys) + ' and ' + Math.max.apply(null, ys) + '.'));
+      }
+      var f = found(), m = misses(), L = lives();
+      count.textContent = f.length + ' of ' + NEED + ' hits found';
+      livesEl.innerHTML = '';
+      for (var i = 0; i < L; i++) { var p = el('span', 'pip'); if (i >= L - spent()) p.setAttribute('data-off', ''); livesEl.appendChild(p); }
+      slots.innerHTML = '';
+      for (var n = 0; n < NEED; n++) {
+        var sl = el('div', 'slot');
+        if (f[n]) {
+          var s = songById(f[n].id); sl.setAttribute('data-found', '');
+          sl.appendChild(el('b', null, s.t)); sl.appendChild(el('small', null, s.y + ' · ' + s.a));
+        } else { sl.appendChild(el('span', null, 'Hit ' + (n + 1))); sl.appendChild(el('small', null, '?')); }
+        slots.appendChild(sl);
+      }
+      renderClue();
+      wrongs.innerHTML = '';
+      if (m.length) {
+        wrongs.appendChild(el('span', null, 'Not by ' + b.n + ':'));
+        m.forEach(function (g) { var s = songById(g.id); wrongs.appendChild(el('span', 'w', s.t)); });
+      }
+      input.disabled = S.done; go.disabled = S.done;
+      newBtn.hidden = !(S.mode === 'random' || S.done);
+    }
+
+    // One hint per miss (plus free ones on Easy), capped at HINT_CAP.
+    function hintCount() { return Math.min(HINT_CAP, misses().length + S.hints); }
+    function maskTitle(title, withLast) {
+      return title.split(' ').map(function (w) {
+        var chars = w.split(''), alnum = chars.filter(function (c) { return /[\p{L}\p{N}]/u.test(c); }).length, pos = -1;
+        return chars.map(function (c) {
+          if (!/[\p{L}\p{N}]/u.test(c)) return c;
+          pos++;
+          return (pos === 0 || (withLast && pos === alnum - 1)) ? c : '_';
+        }).join(' ');
+      }).join('   ·   ');
+    }
+    // Hints come in threes per hit that is still hidden: first letters, album and year, last letters.
+    function hintItems(n) {
+      var b = band(), done = found().map(function (g) { return g.id; }), U = [], out = [], i;
+      for (i = 0; i < b.s.length; i++) if (done.indexOf(S.bi + ':' + i) < 0) U.push(b.s[i]);
+      if (!U.length) return out;
+      for (i = 0; i < n; i++) {
+        var hit = U[Math.floor(i / 3) % U.length], step = i % 3;
+        if (step === 0) out.push('One of their hits starts like this: ' + maskTitle(hit[0], false));
+        else if (step === 1) out.push('Same hit: it is on the album “' + hit[2] + '” (' + hit[1] + ').');
+        else out.push('Same hit, now with the last letters: ' + maskTitle(hit[0], true));
+      }
+      return out;
+    }
+    function updateHintBtn() {
+      hintBtn.hidden = S.diff === 'hard';
+      var full = hintCount() >= HINT_CAP;
+      hintBtn.disabled = S.done || full || !canHint();
+      hintBtn.textContent = full ? 'No more hints' : (S.diff === 'medium' ? 'Give me a hint (costs 1 life)' : 'Give me a hint (free)');
+    }
+    function renderClue() {
+      clue.innerHTML = '';
+      if (S.done) { clue.hidden = true; updateHintBtn(); return; }
+      clue.hidden = false;
+      clue.appendChild(el('div', 'lbl', 'Hints'));
+      var n = hintCount();
+      if (!n) {
+        clue.appendChild(el('p', null, 'Every miss unlocks a new hint about one of the hits.' + (S.diff !== 'hard' ? ' Stuck? Tap “Give me a hint”.' : '')));
+        updateHintBtn(); return;
+      }
+      var all = hintItems(n), ul = el('ul');
+      all.forEach(function (t, i) {
+        var li = el('li', i === all.length - 1 ? 'new' : null);
+        li.appendChild(el('b', null, 'Hint ' + (i + 1) + ':')); li.appendChild(document.createTextNode(t)); ul.appendChild(li);
+      });
+      clue.appendChild(ul);
+      updateHintBtn();
+    }
+
+    function submit(song) {
+      if (S.done) return;
+      if (!song) { toast('Song not found. Pick a title from the suggestions.'); return; }
+      if (S.guesses.some(function (g) { return g.id === song.id; })) { toast('You already tried that one.'); return; }
+      var ok = song.b === S.bi;
+      S.guesses.push({ id: song.id, ok: ok });
+      if (found().length >= NEED) { S.done = true; S.won = true; }
+      else if (spent() >= lives()) { S.done = true; S.won = false; }
+      if (ok) toast('Yes! That is one of their hits.');
+      else toast('Not this band. “' + song.t + '” is by ' + BANDS[song.b].n + '.' + (S.done ? '' : ' New hint unlocked!'));
+      save(); render();
+      if (S.done) finish();
+      input.focus();
+    }
+
+    function finish() {
+      if (S.mode === 'daily' && !S.counted) { statsFinish(sKey(), S.won, day); S.counted = true; save(); statsRender(statsEl, sKey()); }
+      showResult();
+    }
+
+    function shareText() {
+      var line = S.guesses.map(function (g) { return g.ok ? '🟩' : '⬛'; }).join('');
+      return 'Yapin Music · Guess the Song' + (S.mode === 'daily' ? ' #' + day : ' (random)') + ' · ' + DIFF_NAME[S.diff] + '\n' + (S.won ? 'Found ' + NEED + ' hits' : 'Out of lives') + ' · ' + misses().length + ' miss' + (misses().length === 1 ? '' : 'es') + '\n' + line;
+    }
+
+    function showResult() {
+      var b = band();
+      resultEl.innerHTML = '';
+      resultEl.appendChild(el('h2', null, S.won ? 'You got it! ' + misses().length + ' miss' + (misses().length === 1 ? '' : 'es') + '.' : 'Out of lives.'));
+      resultEl.appendChild(el('p', 'sub', 'Biggest hits by ' + b.n + ':'));
+      var ul = el('ul');
+      b.s.forEach(function (s) { ul.appendChild(el('li', null, s[0] + ' · ' + s[1])); });
+      resultEl.appendChild(ul);
+      if (S.mode === 'daily') resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
+      var acts = el('div', 'acts');
+      var copy = el('button', 'btn primary', 'Copy result'); copy.type = 'button';
+      var again = el('button', 'btn', 'Play a random one'); again.type = 'button';
+      acts.appendChild(copy); acts.appendChild(again); resultEl.appendChild(acts);
+      copy.addEventListener('click', function () { copyShare(resultEl, shareText()); });
+      again.addEventListener('click', function () { start('random'); });
+      resultEl.hidden = false;
+    }
+
+    newBtn.addEventListener('click', function () { start('random'); });
+    root.querySelectorAll('[data-mode]').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.mode !== S.mode) start(b.dataset.mode); }); });
+    root.querySelectorAll('[data-diff]').forEach(function (b) {
+      b.addEventListener('click', function () { if (b.dataset.diff !== S.diff) { S.diff = b.dataset.diff; setDiffPref('song', S.diff); start(S.mode); } });
+    });
+    var api = { ready: false, init: function () { if (!api.ready) { api.ready = true; start('daily'); } } };
+    return api;
+  }
+
+  /* ============ GAME 2: GUESS THE BAND (song -> band) ============ */
+
+  function gameBand() {
+    var root = document.getElementById('v-band');
+    var HINT_CAP = 8, orders = {};
+    var S = { mode: 'daily', diff: getDiff('band'), song: null, guesses: [], done: false, won: false, counted: false, hints: 0 };
+    var NOTES = {
+      easy: '9 guesses · the most famous songs · free hint button',
+      medium: '7 guesses · well-known songs · hint button costs 1 guess',
+      hard: '5 guesses · deeper cuts · release year hidden'
+    };
+    function orderFor(d) { if (!orders[d]) orders[d] = shuffledOrder(songPool(d).length, 77030 + DIFFS.indexOf(d)); return orders[d]; }
+    function maxG() { return BAND_TRIES[S.diff]; }
+    function spent() { return S.guesses.length + (S.diff === 'medium' ? S.hints : 0); }
+    function canHint() { return S.diff === 'easy' || (S.diff === 'medium' && maxG() - spent() > 1); }
+    function sKey() { return 'yapin:band:stats' + (S.diff === 'medium' ? '' : ':' + S.diff); }
+    function sk() { return 'yapin:band:daily:' + day + (S.diff === 'medium' ? '' : ':' + S.diff); }
+
+    root.innerHTML =
+      '<div class="game">' +
+        '<div class="game-head"><div><h1>Guess the Band</h1><p class="lede">We name the song. You find the band before you run out of guesses.</p></div>' +
+          '<div class="seg" role="group" aria-label="Game mode"><button type="button" data-mode="daily" aria-pressed="true">Daily</button><button type="button" data-mode="random" aria-pressed="false">Random</button></div></div>' +
+        diffBarHtml() +
+        '<p class="meta" data-meta></p>' +
+        '<div class="target" data-target></div>' +
+        '<div class="status"><span class="count" data-count></span></div>' +
+        '<div class="clue" data-hints></div>' +
+        '<div class="grows" data-rows></div>' +
+        guessForm('band', 'Type a band name…') +
+        '<div class="result" data-result hidden></div>' +
+        '<div class="game-actions"><button type="button" class="btn" data-hint>Give me a hint</button><button type="button" class="btn" data-new hidden>New random song</button></div>' +
+        '<p class="meta" data-statlbl></p>' +
+        '<dl class="stats" data-stats></dl>' +
+      '</div>';
+    var meta = $('[data-meta]', root), target = $('[data-target]', root), count = $('[data-count]', root), rowsEl = $('[data-rows]', root), form = $('[data-form]', root);
+    var input = $('[data-input]', root), list = $('[data-list]', root), go = $('[data-go]', root), resultEl = $('[data-result]', root), newBtn = $('[data-new]', root), statsEl = $('[data-stats]', root);
+    var statLbl = $('[data-statlbl]', root), diffNote = $('[data-diffnote]', root);
+
+    var items = BANDS.map(function (b, i) { return { label: b.n, k: b.k, bi: i }; });
+    var hintBtn = $('[data-hint]', root), hintsEl = $('[data-hints]', root);
+    hintBtn.addEventListener('click', function () {
+      if (S.done || !canHint() || hintCount() >= HINT_CAP) return;
+      S.hints++; save(); render();
+    });
+    var combo = mkCombo(input, list, items, bandKey, function (it, typed) {
+      var bi = it ? it.bi : null;
+      if (bi == null) { var f = lookup(typed, BANDS, function (b) { return b.k; }, bandKey); bi = f ? BANDS.indexOf(f) : null; }
+      submit(bi);
+    });
+    form.addEventListener('submit', function (e) { e.preventDefault(); combo.submitTyped(); });
+
+    function save() { if (S.mode === 'daily') ls.set(sk(), { g: S.guesses, counted: S.counted, h: S.hints }); }
+    function answer() { return BANDS[S.song.b]; }
+
+    function compare(g, a) {
+      var gl = sortLetter(g.n), al = sortLetter(a.n);
+      return {
+        country: { s: g.c === a.c ? 'correct' : '', v: g.c },
+        genre: { s: g.g === a.g ? 'correct' : (g.f === a.f ? 'present' : ''), v: g.g },
+        formed: { s: g.y === a.y ? 'correct' : (Math.abs(g.y - a.y) <= 5 ? 'present' : ''), v: g.y + (g.y < a.y ? ' ↑' : (g.y > a.y ? ' ↓' : '')) },
+        letter: { s: gl === al ? 'correct' : '', v: gl + (gl < al ? ' ↑' : (gl > al ? ' ↓' : '')) }
+      };
+    }
+
+    function start(mode) {
+      S.mode = mode;
+      var sp = songPool(S.diff);
+      if (mode === 'daily') { var ord = orderFor(S.diff); S.song = sp[ord[(day - 1) % ord.length]]; }
+      else { var s; do { s = sp[Math.floor(Math.random() * sp.length)]; } while (s === S.song && sp.length > 1); S.song = s; }
+      S.guesses = []; S.done = false; S.won = false; S.counted = false; S.hints = 0;
+      if (mode === 'daily') {
+        var saved = ls.get(sk());
+        if (saved && Array.isArray(saved.g)) {
+          saved.g.forEach(function (bi) { if (typeof bi === 'number' && BANDS[bi] && S.guesses.indexOf(bi) < 0) S.guesses.push(bi); });
+          S.hints = S.diff === 'hard' ? 0 : Math.min(HINT_CAP, saved.h | 0);
+          S.counted = !!saved.counted;
+        }
+      }
+      if (S.guesses.indexOf(S.song.b) >= 0) { S.done = true; S.won = true; }
+      else if (spent() >= maxG()) { S.done = true; S.won = false; }
+      $('[data-mode="daily"]', root).setAttribute('aria-pressed', String(mode === 'daily'));
+      $('[data-mode="random"]', root).setAttribute('aria-pressed', String(mode === 'random'));
+      root.querySelectorAll('[data-diff]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.diff === S.diff)); });
+      diffNote.textContent = NOTES[S.diff] + ' · every wrong guess unlocks a hint';
+      statLbl.textContent = 'Your stats · ' + DIFF_NAME[S.diff];
+      resultEl.hidden = true;
+      render(); statsRender(statsEl, sKey());
+      if (S.done) showResult();
+    }
+
+    function hintList() {
+      var a = answer(), others = [], i, lettersOnly = a.n.replace(/[^\p{L}\p{N}]/gu, '');
+      for (i = 0; i < a.s.length; i++) { if (a.s[i][0] !== S.song.t) others.push(a.s[i][0]); }
+      var words = a.n.split(' ').length;
+      return [
+        ['Country', 'The band is from ' + a.c + '.'],
+        ['Genre', a.g + '. This song is on the album “' + S.song.a + '”.'],
+        ['Formed', 'The band started in ' + a.y + '.'],
+        ['Another song', 'They also made “' + others[0] + '”.'],
+        ['Name', 'It starts with ' + sortLetter(a.n) + (/^the\s/i.test(a.n) ? ' (ignoring “The”)' : '') + ' and has ' + words + ' word' + (words > 1 ? 's' : '') + '.'],
+        ['Another song', 'They also made “' + (others[1] || others[0]) + '”.'],
+        ['Name length', 'The full name has ' + lettersOnly.length + ' letters, not counting spaces or symbols.'],
+        ['Last letter', 'The name ends with ' + lettersOnly.slice(-1).toUpperCase() + '.']
+      ];
+    }
+    function hintCount() { return Math.min(HINT_CAP, S.guesses.length + S.hints); }
+    function renderHints() {
+      hintsEl.innerHTML = '';
+      var n = hintCount();
+      hintBtn.hidden = S.diff === 'hard';
+      hintBtn.disabled = S.done || n >= HINT_CAP || !canHint();
+      hintBtn.textContent = n >= HINT_CAP ? 'No more hints' : (S.diff === 'medium' ? 'Give me a hint (costs 1 guess)' : 'Give me a hint (free)');
+      if (S.done) { hintsEl.hidden = true; return; }
+      hintsEl.hidden = false;
+      hintsEl.appendChild(el('div', 'lbl', 'Hints'));
+      if (!n) { hintsEl.appendChild(el('p', null, 'Every wrong guess unlocks a new hint about the band.' + (S.diff !== 'hard' ? ' Stuck? Tap “Give me a hint”.' : ''))); return; }
+      var ul = el('ul'), all = hintList();
+      for (var i = 0; i < n; i++) {
+        var li = el('li', i === n - 1 ? 'new' : null); li.appendChild(el('b', null, all[i][0] + ':')); li.appendChild(document.createTextNode(all[i][1])); ul.appendChild(li);
+      }
+      hintsEl.appendChild(ul);
+    }
+
+    function render() {
+      var n = S.guesses.length;
+      meta.textContent = (S.mode === 'daily' ? 'Daily puzzle #' + day : 'Random round') + ' · ' + DIFF_NAME[S.diff];
+      target.innerHTML = '';
+      target.appendChild(el('div', 'lbl', 'Which band plays'));
+      target.appendChild(el('div', 'big', '“' + S.song.t + '”'));
+      if (S.diff !== 'hard') target.appendChild(el('div', 'info', 'Released ' + S.song.y));
+      count.textContent = S.done ? (S.won ? 'Solved in ' + n + ' of ' + maxG() : 'Out of guesses') : 'Guess ' + Math.min(spent() + 1, maxG()) + ' of ' + maxG();
+      renderHints();
+      rowsEl.innerHTML = '';
+      S.guesses.forEach(function (bi, idx) {
+        var g = BANDS[bi], c = compare(g, answer());
+        var row = el('div', 'grow'), head = el('div', 'gn');
+        head.appendChild(document.createTextNode(g.n)); head.appendChild(el('span', null, '#' + (idx + 1)));
+        row.appendChild(head);
+        var chips = el('div', 'chips');
+        [['Country', c.country], ['Genre', c.genre], ['Formed', c.formed], ['Starts with', c.letter]].forEach(function (p) {
+          var ch = el('div', 'chip'); if (p[1].s) ch.setAttribute('data-s', p[1].s);
+          ch.appendChild(el('small', null, p[0])); ch.appendChild(el('b', null, String(p[1].v))); chips.appendChild(ch);
+        });
+        row.appendChild(chips); rowsEl.appendChild(row);
+      });
+      input.disabled = S.done; go.disabled = S.done;
+      newBtn.hidden = !(S.mode === 'random' || S.done);
+    }
+
+    function submit(bi) {
+      if (S.done) return;
+      if (bi == null) { toast('Band not found. Pick a name from the suggestions.'); return; }
+      if (S.guesses.indexOf(bi) >= 0) { toast('You already tried that band.'); return; }
+      S.guesses.push(bi);
+      if (bi === S.song.b) { S.done = true; S.won = true; }
+      else if (spent() >= maxG()) { S.done = true; S.won = false; }
+      if (!S.done) toast('Not this band. New hint unlocked!');
+      save(); render();
+      if (S.done) { if (S.mode === 'daily' && !S.counted) { statsFinish(sKey(), S.won, day); S.counted = true; save(); statsRender(statsEl, sKey()); } showResult(); }
+      input.focus();
+    }
+
+    function shareText() {
+      var a = answer(), map = { correct: '🟩', present: '🟨', '': '⬛' };
+      var lines = S.guesses.map(function (bi) { var c = compare(BANDS[bi], a); return [c.country, c.genre, c.formed, c.letter].map(function (x) { return map[x.s]; }).join(''); });
+      return 'Yapin Music · Guess the Band' + (S.mode === 'daily' ? ' #' + day : ' (random)') + ' · ' + DIFF_NAME[S.diff] + ' ' + (S.won ? S.guesses.length : 'X') + '/' + maxG() + '\n' + lines.join('\n');
+    }
+
+    function showResult() {
+      var a = answer();
+      resultEl.innerHTML = '';
+      resultEl.appendChild(el('h2', null, S.won ? 'Nice! ' + S.guesses.length + '/' + maxG() + '.' : 'Not this time. It was:'));
+      resultEl.appendChild(el('p', 'ans', a.n));
+      resultEl.appendChild(el('p', 'sub', '“' + S.song.t + '” · ' + S.song.a + ' · ' + S.song.y));
+      resultEl.appendChild(el('p', 'sub', a.g + ' · ' + a.c + ' · formed ' + a.y));
+      if (S.mode === 'daily') resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
+      var acts = el('div', 'acts');
+      var copy = el('button', 'btn primary', 'Copy result'); copy.type = 'button';
+      var again = el('button', 'btn', 'Play a random one'); again.type = 'button';
+      acts.appendChild(copy); acts.appendChild(again); resultEl.appendChild(acts);
+      copy.addEventListener('click', function () { copyShare(resultEl, shareText()); });
+      again.addEventListener('click', function () { start('random'); });
+      resultEl.hidden = false;
+    }
+
+    newBtn.addEventListener('click', function () { start('random'); });
+    root.querySelectorAll('[data-mode]').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.mode !== S.mode) start(b.dataset.mode); }); });
+    root.querySelectorAll('[data-diff]').forEach(function (b) {
+      b.addEventListener('click', function () { if (b.dataset.diff !== S.diff) { S.diff = b.dataset.diff; setDiffPref('band', S.diff); start(S.mode); } });
+    });
+    var api = { ready: false, init: function () { if (!api.ready) { api.ready = true; start('daily'); } } };
+    return api;
+  }
+
+  games.song = gameSong();
+  games.band = gameBand();
+
+  /* ============ TEAM ============ */
+
+  (function renderTeam() {
+    var list = $('#team-list');
+    TEAM.forEach(function (tier) {
+      var sec = el('section', 'tier' + (tier.role === 'Owner' ? ' owner' : ''));
+      var info = el('div', 'tier-info');
+      var h = el('h2', null, tier.role); h.appendChild(el('span', 'cnt', String(tier.members.length)));
+      info.appendChild(h); info.appendChild(el('p', null, tier.info));
+      var ul = el('ul', 'members');
+      tier.members.forEach(function (m) {
+        var li = el('li', 'member');
+        var img = el('img'); img.src = m.avatar || ICON; img.alt = ''; img.width = 56; img.height = 56;
+        var who = el('div', 'who'); who.appendChild(el('div', 'nm', m.name)); who.appendChild(el('div', 'hd', m.handle));
+        li.appendChild(img); li.appendChild(who); ul.appendChild(li);
+      });
+      if (!tier.members.length) ul.appendChild(el('li', 'vacant', 'No one in this role yet.'));
+      sec.appendChild(info); sec.appendChild(ul); list.appendChild(sec);
+    });
+  })();
+
+  /* ============ ROUTES ============ */
+
+  var VIEWS = ['home', 'song', 'band', 'our-team'];
+  function route() {
+    var h = location.hash.replace('#', '');
+    if (VIEWS.indexOf(h) < 0) h = 'home';
+    VIEWS.forEach(function (v) { document.getElementById('v-' + v).hidden = v !== h; });
+    document.querySelectorAll('[data-nav]').forEach(function (a) {
+      if (a.dataset.nav === h) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    document.getElementById('band').toggleAttribute('data-home', h === 'home');
+    active = games[h] || null;
+    if (active) active.init();
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', route);
+  route();
+})();

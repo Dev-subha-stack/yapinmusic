@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Yapin Music — two music guessing games with daily and random rounds." />
+    <meta name="theme-color" content="#FF6B35" />
+    <meta property="og:title" content="Yapin Music" />
+    <meta property="og:description" content="Name the hit. Name the band." />
+    <meta property="og:type" content="website" />
+    <title>Yapin Music — Name the hit. Name the band.</title>
+    <link rel="icon" type="image/png" href="/assets/favicon.webp" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;600;700&family=Unbounded:wght@800&display=swap" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+<div class="band" id="band" data-home="" role="presentation"><div class="band-title" aria-hidden="true"><span style="--i:0">Y</span><span style="--i:1">a</span><span style="--i:2">p</span><span style="--i:3">i</span><span style="--i:4">n</span><span class="sp"></span><span style="--i:6">M</span><span style="--i:7">u</span><span style="--i:8">s</span><span style="--i:9">i</span><span style="--i:10">c</span></div></div>
+<header class="site-head"><div class="wrap top">
+  <a class="brand" href="#home"><img src="/assets/brand-icon.webp" alt="" width="40" height="40"><span>Yapin Music</span></a>
+  <nav aria-label="Main">
+    <a href="#home" data-nav="home">Home</a>
+    <a href="#song" data-nav="song">Guess the Song</a>
+    <a href="#band" data-nav="band">Guess the Band</a>
+    <a href="#our-team" data-nav="our-team">Our Team</a>
+  </nav>
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+    <span class="theme-icon" data-theme-icon aria-hidden="true">☾</span>
+    <span data-theme-label>Dark mode</span>
+  </button>
+</div></header>
+
+<main class="wrap">
+  <!-- HOME -->
+  <section id="v-home" class="hero">
+    <div>
+      <h1>Name the hit. Name the band.</h1>
+      <p class="lede">Two music guessing games. In one, we give you the band and you name its songs. In the other, we give you the song and you find the band. Pick Easy, Medium or Hard.</p>
+    </div>
+    <div class="cards">
+      <a class="gcard" href="#song">
+        <div class="preview" aria-hidden="true">
+          <div class="mini-slot" data-found="">Hit 1 · found</div>
+          <div class="mini-slot">Hit 2 · ?</div>
+          <div class="mini-slot">Hit 3 · ?</div>
+        </div>
+        <h2>Guess the Song</h2>
+        <p>We show you a band. Find 3 of its hit songs. Every wrong answer gives you another clue.</p>
+        <span class="go">Play →</span>
+      </a>
+      <a class="gcard" href="#band">
+        <div class="chips" aria-hidden="true">
+          <div class="chip" data-s="correct"><small>Country</small><b>USA</b></div>
+          <div class="chip" data-s="present"><small>Genre</small><b>Metal</b></div>
+          <div class="chip"><small>Formed</small><b>1981 ↑</b></div>
+          <div class="chip" data-s="correct"><small>Starts with</small><b>M</b></div>
+        </div>
+        <h2>Guess the Band</h2>
+        <p>We show you a song. Guess which band made it before you run out of tries. Wrong guesses reveal clues about the band.</p>
+        <span class="go">Play →</span>
+      </a>
+    </div>
+    <section class="how" aria-labelledby="how-h">
+      <h2 id="how-h">How it works</h2>
+      <div class="how-grid">
+        <div class="how-col">
+          <h3>Guess the Song</h3>
+          <ul>
+            <li>We show you a band and give you lives: 8 on Easy, 6 on Medium, or 4 on Hard.</li>
+            <li>Type a song title and choose it from the suggestions.</li>
+            <li>Find any 3 of the band’s hit songs to win. A wrong answer uses 1 life and reveals a clue.</li>
+            <li>Hints are free on Easy, cost 1 life on Medium, and are turned off on Hard.</li>
+          </ul>
+        </div>
+        <div class="how-col">
+          <h3>Guess the Band</h3>
+          <ul>
+            <li>We show you a song (and its release year, except on Hard).</li>
+            <li>Guess the band. You get 9 tries on Easy, 7 on Medium, or 5 on Hard.</li>
+            <li>After a wrong guess, compare the clues for country, genre, formation year, and first letter.</li>
+            <li>Hints are free on Easy, cost 1 guess on Medium, and are turned off on Hard.</li>
+          </ul>
+        </div>
+        <div class="how-col">
+          <h3>Difficulty</h3>
+          <ul>
+            <li><strong>Easy:</strong> famous bands and songs, with more lives or guesses.</li>
+            <li><strong>Medium:</strong> more bands and songs, with fewer tries.</li>
+            <li><strong>Hard:</strong> less familiar songs, fewer tries, and less help.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="chips" aria-hidden="true">
+          <div class="chip" data-s="correct"><small>Country</small><b>Same</b></div>
+          <div class="chip" data-s="present"><small>Genre</small><b>Close</b></div>
+          <div class="chip"><small>Formed</small><b>1970 ↑</b></div>
+          <div class="chip"><small>Starts with</small><b>Q ↓</b></div>
+        </div>
+        <p><strong>Green</strong> means the clue matches. <strong>Yellow</strong> means it is close (a similar genre or a formation year within 5 years). <strong>Grey</strong> means it does not match. Arrows show whether the answer is higher or lower.</p>
+      </div>
+      <p class="legend"><span><strong>Daily:</strong> everyone gets the same puzzle each day; it changes at midnight. <strong>Random:</strong> play a fresh round whenever you like.</span></p>
+    </section>
+  </section>
+
+  <!-- GAMES (built by script) -->
+  <section id="v-song" hidden=""></section>
+  <section id="v-band" hidden=""></section>
+
+  <!-- OUR TEAM -->
+  <section id="v-our-team" hidden="">
+    <div class="team-head">
+      <h1>Our Team</h1>
+      <p class="lede">The people who look after the community and keep everything running.</p>
+    </div>
+    <div id="team-list"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="foot-band" role="presentation"></div>
+  <div class="wrap">Yapin Music · Name the song. Name the band.</div>
+</footer>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden=""></div>
+    <script type="module" src="/src/js/app.js"></script>
+  </body>
+</html>

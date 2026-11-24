@@ -1,0 +1,17 @@
+{
+  "name": "yapin-music",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Yapin Music \u2014 daily and random music guessing games.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test",
+    "check": "node --check src/js/app.js && node --check src/data/music.js && node --check src/data/team.js"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
