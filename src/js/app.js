@@ -150,6 +150,17 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   }
 
   var games = {}, active = null;
+  var queuedRandomGame = null;
+  function surpriseGame() {
+    var next = Math.random() < 0.5 ? 'song' : 'band';
+    queuedRandomGame = next;
+    if (location.hash === '#' + next) {
+      if (games[next]) games[next].random();
+      queuedRandomGame = null;
+    } else {
+      location.hash = '#' + next;
+    }
+  }
   var day = dayNumber();
 
   /* ============ DIFFICULTY ============ */
@@ -202,13 +213,14 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         diffBarHtml() +
         '<p class="meta" data-meta></p>' +
         '<div class="target" data-target></div>' +
+        '<div class="game-info-host" data-game-info></div>' +
         '<div class="status"><span class="count" data-count></span><span class="lives" data-lives aria-label="Lives left"></span></div>' +
         '<div class="slots" data-slots></div>' +
         '<div class="clue" data-clue></div>' +
         '<div class="wrongs" data-wrongs></div>' +
         guessForm('song', 'Type a song title…') +
         '<div class="result" data-result hidden></div>' +
-        '<div class="game-actions"><button type="button" class="btn" data-hint>Give me a hint</button><button type="button" class="btn" data-new hidden>New random band</button></div>' +
+        '<div class="game-actions"><button type="button" class="btn" data-hint>Give me a hint</button><button type="button" class="btn" data-new hidden>New random band</button><button type="button" class="btn surprise-btn" data-surprise>Surprise me</button></div>' +
         '<p class="meta" data-statlbl></p>' +
         '<dl class="stats" data-stats></dl>' +
       '</div>';
@@ -216,9 +228,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     var slots = $('[data-slots]', root), clue = $('[data-clue]', root), wrongs = $('[data-wrongs]', root), form = $('[data-form]', root);
     var input = $('[data-input]', root), list = $('[data-list]', root), go = $('[data-go]', root), resultEl = $('[data-result]', root), newBtn = $('[data-new]', root), statsEl = $('[data-stats]', root);
     var statLbl = $('[data-statlbl]', root), diffNote = $('[data-diffnote]', root);
+    var gameInfoEl = $('[data-game-info]', root);
+    var bandSpotlight = { name: '', data: null, loading: false, error: false };
 
     var items = SONGS.map(function (s) { return { label: s.t, k: s.k, song: s }; });
     var hintBtn = $('[data-hint]', root);
+    $('[data-surprise]', root).addEventListener('click', surpriseGame);
     hintBtn.addEventListener('click', function () {
       if (S.done || !canHint() || hintCount() >= HINT_CAP) return;
       S.hints++; save(); render();
@@ -230,6 +245,72 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     function band() { return BANDS[S.bi]; }
     function found() { return S.guesses.filter(function (g) { return g.ok; }); }
     function misses() { return S.guesses.filter(function (g) { return !g.ok; }); }
+
+    function renderBandSpotlight() {
+      var b = band();
+      if (bandSpotlight.name !== b.n) bandSpotlight = { name: b.n, data: null, loading: false, error: false };
+      gameInfoEl.innerHTML = '';
+      var card = el('section', 'game-info-card');
+      var top = el('div', 'game-info-top');
+      var copy = el('div', 'game-info-copy');
+      copy.appendChild(el('span', 'game-info-kicker', 'ARTIST SPOTLIGHT'));
+      copy.appendChild(el('h2', null, b.n));
+      copy.appendChild(el('p', 'game-info-sub', 'A little background while you hunt for three hits.'));
+      top.appendChild(copy);
+      if (bandSpotlight.data && bandSpotlight.data.image) {
+        var photo = el('img', 'game-info-image');
+        photo.src = bandSpotlight.data.image;
+        photo.alt = 'Photo related to ' + b.n;
+        photo.loading = 'lazy';
+        top.appendChild(photo);
+      }
+      card.appendChild(top);
+      var facts = el('div', 'game-info-facts');
+      [['Formed', b.y], ['Country', b.c], ['Genre', b.g], ['Yapin tracks', b.s.length]].forEach(function (item) {
+        var fact = el('div', 'game-info-fact');
+        fact.appendChild(el('small', null, item[0]));
+        fact.appendChild(el('b', null, String(item[1])));
+        facts.appendChild(fact);
+      });
+      card.appendChild(facts);
+      if (bandSpotlight.data && bandSpotlight.data.description) card.appendChild(el('p', 'game-info-sub', bandSpotlight.data.description));
+      if (bandSpotlight.data && bandSpotlight.data.extract) card.appendChild(el('p', 'game-info-extract', bandSpotlight.data.extract));
+      if (bandSpotlight.error) card.appendChild(el('p', 'game-info-note', 'Online artist information is unavailable. The built-in band facts above are still available.'));
+      var actions = el('div', 'game-info-actions');
+      var load = el('button', 'btn', bandSpotlight.loading ? 'Loading artist story…' : (bandSpotlight.data ? 'Refresh artist story' : 'Load artist story'));
+      load.type = 'button';
+      load.disabled = bandSpotlight.loading;
+      actions.appendChild(load);
+      if (bandSpotlight.data && bandSpotlight.data.url) {
+        var wiki = el('a', 'btn', 'Read on Wikipedia');
+        wiki.href = bandSpotlight.data.url;
+        wiki.target = '_blank';
+        wiki.rel = 'noopener noreferrer';
+        actions.appendChild(wiki);
+      }
+      card.appendChild(actions);
+      gameInfoEl.appendChild(card);
+      load.addEventListener('click', async function () {
+        if (bandSpotlight.loading) return;
+        bandSpotlight.loading = true;
+        bandSpotlight.error = false;
+        renderBandSpotlight();
+        try {
+          var result = await searchBandInfo(b.n);
+          if (bandSpotlight.name === b.n) {
+            bandSpotlight.data = result;
+            if (!result) bandSpotlight.error = true;
+          }
+        } catch (error) {
+          if (bandSpotlight.name === b.n) bandSpotlight.error = true;
+        } finally {
+          if (bandSpotlight.name === b.n) {
+            bandSpotlight.loading = false;
+            renderBandSpotlight();
+          }
+        }
+      });
+    }
 
     function start(mode) {
       S.mode = mode;
@@ -283,6 +364,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         } else { sl.appendChild(el('span', null, 'Hit ' + (n + 1))); sl.appendChild(el('small', null, '?')); }
         slots.appendChild(sl);
       }
+      renderBandSpotlight();
       renderClue();
       wrongs.innerHTML = '';
       if (m.length) {
@@ -391,7 +473,11 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     root.querySelectorAll('[data-diff]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.diff !== S.diff) { S.diff = b.dataset.diff; setDiffPref('song', S.diff); start(S.mode); } });
     });
-    var api = { ready: false, init: function () { if (!api.ready) { api.ready = true; start('daily'); } } };
+    var api = {
+      ready: false,
+      init: function () { if (!api.ready) { api.ready = true; start('daily'); } },
+      random: function () { api.init(); start('random'); }
+    };
     return api;
   }
 
@@ -420,21 +506,26 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         diffBarHtml() +
         '<p class="meta" data-meta></p>' +
         '<div class="target" data-target></div>' +
+        '<div class="game-info-host" data-game-info></div>' +
         '<div class="status"><span class="count" data-count></span></div>' +
         '<div class="clue" data-hints></div>' +
         '<div class="grows" data-rows></div>' +
         guessForm('band', 'Type a band name…') +
         '<div class="result" data-result hidden></div>' +
-        '<div class="game-actions"><button type="button" class="btn" data-hint>Give me a hint</button><button type="button" class="btn" data-new hidden>New random song</button></div>' +
+        '<div class="game-actions"><button type="button" class="btn" data-hint>Give me a hint</button><button type="button" class="btn" data-new hidden>New random song</button><button type="button" class="btn surprise-btn" data-surprise>Surprise me</button></div>' +
         '<p class="meta" data-statlbl></p>' +
         '<dl class="stats" data-stats></dl>' +
       '</div>';
     var meta = $('[data-meta]', root), target = $('[data-target]', root), count = $('[data-count]', root), rowsEl = $('[data-rows]', root), form = $('[data-form]', root);
     var input = $('[data-input]', root), list = $('[data-list]', root), go = $('[data-go]', root), resultEl = $('[data-result]', root), newBtn = $('[data-new]', root), statsEl = $('[data-stats]', root);
     var statLbl = $('[data-statlbl]', root), diffNote = $('[data-diffnote]', root);
+    var gameInfoEl = $('[data-game-info]', root);
+    var trackSpotlight = { id: '', data: null, loading: false, error: false };
+    var artistSpotlight = { name: '', data: null, loading: false, error: false };
 
     var items = BANDS.map(function (b, i) { return { label: b.n, k: b.k, bi: i }; });
     var hintBtn = $('[data-hint]', root), hintsEl = $('[data-hints]', root);
+    $('[data-surprise]', root).addEventListener('click', surpriseGame);
     hintBtn.addEventListener('click', function () {
       if (S.done || !canHint() || hintCount() >= HINT_CAP) return;
       S.hints++; save(); render();
@@ -448,6 +539,135 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
     function save() { if (S.mode === 'daily') ls.set(sk(), { g: S.guesses, counted: S.counted, h: S.hints }); }
     function answer() { return BANDS[S.song.b]; }
+
+    function addGameInfoFact(parent, label, value) {
+      if (value == null || value === '') return;
+      var fact = el('div', 'game-info-fact');
+      fact.appendChild(el('small', null, label));
+      fact.appendChild(el('b', null, String(value)));
+      parent.appendChild(fact);
+    }
+    function formatTrackDuration(milliseconds) {
+      var seconds = Math.round(milliseconds / 1000);
+      return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+    }
+    function renderTrackSpotlight() {
+      var song = S.song, artist = answer();
+      if (trackSpotlight.id !== song.id) trackSpotlight = { id: song.id, data: null, loading: false, error: false };
+      if (artistSpotlight.name !== artist.n) artistSpotlight = { name: artist.n, data: null, loading: false, error: false };
+      gameInfoEl.innerHTML = '';
+      var card = el('section', 'game-info-card');
+      var top = el('div', 'game-info-top');
+      var copy = el('div', 'game-info-copy');
+      copy.appendChild(el('span', 'game-info-kicker', 'TRACK SPOTLIGHT'));
+      copy.appendChild(el('h2', null, song.t));
+      copy.appendChild(el('p', 'game-info-sub', 'Album: ' + song.a));
+      if (S.done) copy.appendChild(el('p', 'game-info-answer', 'Artist: ' + artist.n));
+      else copy.appendChild(el('p', 'game-info-sub', 'The performer stays hidden until you solve the round.'));
+      top.appendChild(copy);
+      if (trackSpotlight.data && trackSpotlight.data.artwork) {
+        var artwork = el('img', 'game-info-image game-info-artwork');
+        artwork.src = trackSpotlight.data.artwork;
+        artwork.alt = 'Album artwork for ' + song.t;
+        artwork.loading = 'lazy';
+        top.appendChild(artwork);
+      }
+      card.appendChild(top);
+      var facts = el('div', 'game-info-facts');
+      if (trackSpotlight.data) {
+        if (trackSpotlight.data.releaseDate) addGameInfoFact(facts, 'Release', new Date(trackSpotlight.data.releaseDate).getFullYear());
+        if (trackSpotlight.data.genre) addGameInfoFact(facts, 'Genre', trackSpotlight.data.genre);
+        if (trackSpotlight.data.duration) addGameInfoFact(facts, 'Length', formatTrackDuration(trackSpotlight.data.duration));
+      } else if (S.diff === 'hard' && !S.done) {
+        addGameInfoFact(facts, 'Extra clues', 'Unlocked after the round');
+      } else {
+        addGameInfoFact(facts, 'Release year', song.y);
+        addGameInfoFact(facts, 'Album', song.a);
+      }
+      if (facts.children.length) card.appendChild(facts);
+      if (trackSpotlight.error) card.appendChild(el('p', 'game-info-note', 'The online track catalogue could not be reached. Your guessing round is unaffected.'));
+      var actions = el('div', 'game-info-actions');
+      var trackButton = el('button', 'btn', trackSpotlight.loading ? 'Loading track details…' : (trackSpotlight.data ? 'Refresh track details' : 'Load track details'));
+      trackButton.type = 'button';
+      trackButton.disabled = trackSpotlight.loading || (S.diff === 'hard' && !S.done);
+      if (S.diff === 'hard' && !S.done) trackButton.textContent = 'Track details unlock after the round';
+      actions.appendChild(trackButton);
+      if (S.done && trackSpotlight.data && trackSpotlight.data.url) {
+        var apple = el('a', 'btn', 'Open Apple Music');
+        apple.href = trackSpotlight.data.url;
+        apple.target = '_blank';
+        apple.rel = 'noopener noreferrer';
+        actions.appendChild(apple);
+      }
+      card.appendChild(actions);
+      if (S.done) {
+        var artistSection = el('div', 'game-info-artist');
+        artistSection.appendChild(el('span', 'game-info-kicker', 'ARTIST STORY'));
+        if (artistSpotlight.data && artistSpotlight.data.image) {
+          var artistImage = el('img', 'game-info-image');
+          artistImage.src = artistSpotlight.data.image;
+          artistImage.alt = 'Photo related to ' + artist.n;
+          artistImage.loading = 'lazy';
+          artistSection.appendChild(artistImage);
+        }
+        if (artistSpotlight.data && artistSpotlight.data.description) artistSection.appendChild(el('p', 'game-info-sub', artistSpotlight.data.description));
+        if (artistSpotlight.data && artistSpotlight.data.extract) artistSection.appendChild(el('p', 'game-info-extract', artistSpotlight.data.extract));
+        if (artistSpotlight.error) artistSection.appendChild(el('p', 'game-info-note', 'Artist biography is unavailable right now.'));
+        var artistButton = el('button', 'btn', artistSpotlight.loading ? 'Loading artist story…' : (artistSpotlight.data ? 'Refresh artist story' : 'Read about ' + artist.n));
+        artistButton.type = 'button';
+        artistButton.disabled = artistSpotlight.loading;
+        artistSection.appendChild(artistButton);
+        if (artistSpotlight.data && artistSpotlight.data.url) {
+          var wiki = el('a', 'btn', 'Wikipedia article');
+          wiki.href = artistSpotlight.data.url;
+          wiki.target = '_blank';
+          wiki.rel = 'noopener noreferrer';
+          artistSection.appendChild(wiki);
+        }
+        card.appendChild(artistSection);
+        artistButton.addEventListener('click', async function () {
+          if (artistSpotlight.loading) return;
+          artistSpotlight.loading = true;
+          renderTrackSpotlight();
+          try {
+            var artistResult = await searchBandInfo(artist.n);
+            if (artistSpotlight.name === artist.n) {
+              artistSpotlight.data = artistResult;
+              if (!artistResult) artistSpotlight.error = true;
+            }
+          } catch (error) {
+            if (artistSpotlight.name === artist.n) artistSpotlight.error = true;
+          } finally {
+            if (artistSpotlight.name === artist.n) {
+              artistSpotlight.loading = false;
+              renderTrackSpotlight();
+            }
+          }
+        });
+      }
+      gameInfoEl.appendChild(card);
+      trackButton.addEventListener('click', async function () {
+        if (trackSpotlight.loading || (S.diff === 'hard' && !S.done)) return;
+        trackSpotlight.loading = true;
+        trackSpotlight.error = false;
+        renderTrackSpotlight();
+        try {
+          var results = await searchSongInfo(song.t);
+          var matchingTrack = results.find(function (item) { return key(item.title) === key(song.t); }) || results[0] || null;
+          if (trackSpotlight.id === song.id) {
+            trackSpotlight.data = matchingTrack;
+            if (!matchingTrack) trackSpotlight.error = true;
+          }
+        } catch (error) {
+          if (trackSpotlight.id === song.id) trackSpotlight.error = true;
+        } finally {
+          if (trackSpotlight.id === song.id) {
+            trackSpotlight.loading = false;
+            renderTrackSpotlight();
+          }
+        }
+      });
+    }
 
     function compare(g, a) {
       var gl = sortLetter(g.n), al = sortLetter(a.n);
@@ -520,6 +740,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
     function render() {
       var n = S.guesses.length;
+      renderTrackSpotlight();
       meta.textContent = (S.mode === 'daily' ? 'Daily puzzle #' + day : 'Random round') + ' · ' + DIFF_NAME[S.diff];
       target.innerHTML = '';
       target.appendChild(el('div', 'lbl', 'Which band plays'));
@@ -585,7 +806,11 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     root.querySelectorAll('[data-diff]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.diff !== S.diff) { S.diff = b.dataset.diff; setDiffPref('band', S.diff); start(S.mode); } });
     });
-    var api = { ready: false, init: function () { if (!api.ready) { api.ready = true; start('daily'); } } };
+    var api = {
+      ready: false,
+      init: function () { if (!api.ready) { api.ready = true; start('daily'); } },
+      random: function () { api.init(); start('random'); }
+    };
     return api;
   }
 
@@ -813,6 +1038,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     document.getElementById('band').toggleAttribute('data-home', h === 'home');
     active = games[h] || null;
     if (active) active.init();
+    if (queuedRandomGame === h && active && active.random) {
+      active.random();
+      queuedRandomGame = null;
+    }
     window.scrollTo(0, 0);
   }
   window.addEventListener('hashchange', route);
