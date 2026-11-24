@@ -1,5 +1,6 @@
 import { BANDS } from '../data/music.js';
 import { TEAM } from '../data/team.js';
+import { searchBandInfo, searchSongInfo } from '../services/music-info.js';
 import { storage as ls } from '../services/storage.js';
 import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
@@ -588,8 +589,195 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     return api;
   }
 
+
+  /* ============ MUSIC EXPLORER ============ */
+
+  function musicExplorer() {
+    var root = document.getElementById('v-explore');
+    var kind = 'band', busy = false;
+    function localBand(query) {
+      var normalized = bandKey(query);
+      return BANDS.find(function (b) {
+        return b.k === normalized || b.k.indexOf(normalized) >= 0 || normalized.indexOf(b.k) >= 0;
+      }) || null;
+    }
+    function addLink(parent, href, label, cls) {
+      if (!href) return;
+      var link = el('a', cls || 'btn', label);
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      parent.appendChild(link);
+    }
+    function fact(parent, label, value) {
+      if (value == null || value === '') return;
+      var item = el('div', 'music-fact');
+      item.appendChild(el('small', null, label));
+      item.appendChild(el('b', null, String(value)));
+      parent.appendChild(item);
+    }
+    function setStatus(message, isError) {
+      var status = $('[data-explore-status]', root);
+      status.textContent = message || '';
+      status.setAttribute('data-error', String(!!isError));
+    }
+    function setBusy(value) {
+      busy = value;
+      var button = $('[data-explore-submit]', root);
+      button.disabled = value;
+      button.textContent = value ? 'Searching…' : 'Search';
+    }
+    function renderBand(query, online, error) {
+      var area = $('[data-explore-results]', root);
+      area.innerHTML = '';
+      var local = localBand(query);
+      if (!online && !local) {
+        setStatus(error ? 'The online service is unavailable right now. Try again in a moment.' : 'No band information found. Try a different spelling.', !!error);
+        return;
+      }
+      var card = el('article', 'music-info-card');
+      var heading = el('div', 'music-info-heading');
+      heading.appendChild(el('h2', null, (online && online.title) || (local && local.n) || query));
+      if (online && online.description) heading.appendChild(el('p', 'music-description', online.description));
+      card.appendChild(heading);
+      if (online && online.image) {
+        var image = el('img', 'music-cover');
+        image.src = online.image;
+        image.alt = 'Photo related to ' + ((online && online.title) || query);
+        image.loading = 'lazy';
+        card.appendChild(image);
+      }
+      if (local) {
+        var facts = el('div', 'music-facts');
+        fact(facts, 'Formed', local.y);
+        fact(facts, 'Country', local.c);
+        fact(facts, 'Genre', local.g);
+        fact(facts, 'Songs in Yapin', local.s.length);
+        card.appendChild(facts);
+        var songs = el('div', 'music-catalog');
+        songs.appendChild(el('h3', null, 'Songs in the Yapin Music catalog'));
+        var list = el('ul');
+        local.s.slice(0, 8).forEach(function (song) {
+          list.appendChild(el('li', null, song[0] + ' · ' + song[1] + ' · ' + song[2]));
+        });
+        songs.appendChild(list);
+        card.appendChild(songs);
+      }
+      if (online && online.extract) card.appendChild(el('p', 'music-extract', online.extract));
+      if (online && online.url) addLink(card, online.url, 'Read full article on Wikipedia', 'btn');
+      addLink(card, 'https://open.spotify.com/search/' + encodeURIComponent(query), 'Search on Spotify', 'btn');
+      if (error) card.appendChild(el('p', 'music-muted', 'Wikipedia could not be reached, so only Yapin’s built-in catalog details are shown.'));
+      area.appendChild(card);
+      setStatus(online ? 'Band information from Wikipedia' : 'Showing Yapin Music catalog information');
+    }
+    function durationLabel(ms) {
+      if (!ms) return '';
+      var total = Math.round(ms / 1000);
+      return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+    }
+    function renderSongs(query, songs) {
+      var area = $('[data-explore-results]', root);
+      area.innerHTML = '';
+      if (!songs.length) {
+        setStatus('No matching songs were found in the Apple Music catalog. Try the title plus the artist name.', false);
+        return;
+      }
+      songs.forEach(function (song) {
+        var card = el('article', 'music-info-card song-info-card');
+        var top = el('div', 'song-info-top');
+        if (song.artwork) {
+          var image = el('img', 'music-cover');
+          image.src = song.artwork;
+          image.alt = 'Album artwork for ' + song.title;
+          image.loading = 'lazy';
+          top.appendChild(image);
+        }
+        var info = el('div', 'song-info-copy');
+        info.appendChild(el('h2', null, song.title));
+        info.appendChild(el('p', 'music-description', song.artist));
+        if (song.album) info.appendChild(el('p', 'music-muted', song.album));
+        top.appendChild(info);
+        card.appendChild(top);
+        var facts = el('div', 'music-facts');
+        fact(facts, 'Release date', song.releaseDate ? new Date(song.releaseDate).getFullYear() : '');
+        fact(facts, 'Genre', song.genre);
+        fact(facts, 'Duration', durationLabel(song.duration));
+        card.appendChild(facts);
+        if (song.url) addLink(card, song.url, 'View on Apple Music', 'btn primary');
+        addLink(card, 'https://open.spotify.com/search/' + encodeURIComponent(song.title + ' ' + song.artist), 'Search on Spotify', 'btn');
+        area.appendChild(card);
+      });
+      setStatus('Song and album details from Apple Music / iTunes');
+    }
+    function render() {
+      root.innerHTML =
+        '<div class="explorer">' +
+          '<div class="explorer-head"><h1>Music Explorer</h1><p class="lede">Discover the stories behind bands, and explore songs, albums and release details.</p></div>' +
+          '<div class="explorer-panel">' +
+            '<div class="seg explorer-tabs" role="group" aria-label="Choose what to search">' +
+              '<button type="button" data-explore-type="band" aria-pressed="true">Bands & artists</button>' +
+              '<button type="button" data-explore-type="song" aria-pressed="false">Songs</button>' +
+            '</div>' +
+            '<form class="explore-search" data-explore-form>' +
+              '<input type="search" data-explore-input placeholder="Search for a band or artist…" aria-label="Search music information" maxlength="120" autocomplete="off">' +
+              '<button class="btn primary" type="submit" data-explore-submit>Search</button>' +
+            '</form>' +
+            '<p class="music-muted">Search online when you press Search. Results are cached on this device for 7 days.</p>' +
+            '<p class="explore-status" data-explore-status role="status" aria-live="polite">Search for a band, artist or song to get started.</p>' +
+            '<div class="explore-results" data-explore-results></div>' +
+          '</div>' +
+          '<p class="explore-credit">Band biographies are provided by Wikipedia. Song and album catalog details are supplied by Apple Music / iTunes Search.</p>' +
+        '</div>';
+      var input = $('[data-explore-input]', root);
+      $('[data-explore-form]', root).addEventListener('submit', async function (event) {
+        event.preventDefault();
+        if (busy) return;
+        var query = input.value.trim();
+        if (!query) { setStatus('Enter a band, artist or song name first.'); input.focus(); return; }
+        setBusy(true);
+        setStatus(kind === 'band' ? 'Looking up band information…' : 'Looking up song and album details…');
+        try {
+          if (kind === 'band') {
+            var online = await searchBandInfo(query);
+            renderBand(query, online, false);
+          } else {
+            var songs = await searchSongInfo(query);
+            renderSongs(query, songs);
+          }
+        } catch (error) {
+          if (kind === 'band') renderBand(query, null, error);
+          else {
+            $('[data-explore-results]', root).innerHTML = '';
+            setStatus('The Apple Music search service is unavailable right now. Your game is unaffected; try again later.', true);
+          }
+        } finally {
+          setBusy(false);
+        }
+      });
+      root.querySelectorAll('[data-explore-type]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          kind = button.dataset.exploreType;
+          root.querySelectorAll('[data-explore-type]').forEach(function (item) {
+            item.setAttribute('aria-pressed', String(item.dataset.exploreType === kind));
+          });
+          input.placeholder = kind === 'band' ? 'Search for a band or artist…' : 'Search for a song…';
+          input.value = '';
+          $('[data-explore-results]', root).innerHTML = '';
+          setStatus(kind === 'band' ? 'Search for a band or artist to read its story.' : 'Search for a song to explore its album and release details.');
+        });
+      });
+    }
+    return {
+      ready: false,
+      init: function () {
+        if (!this.ready) { this.ready = true; render(); }
+      }
+    };
+  }
+
   games.song = gameSong();
   games.band = gameBand();
+  games.explore = musicExplorer();
 
   /* ============ TEAM ============ */
 
@@ -614,7 +802,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
   /* ============ ROUTES ============ */
 
-  var VIEWS = ['home', 'song', 'band', 'our-team'];
+  var VIEWS = ['home', 'song', 'band', 'explore', 'our-team'];
   function route() {
     var h = location.hash.replace('#', '');
     if (VIEWS.indexOf(h) < 0) h = 'home';

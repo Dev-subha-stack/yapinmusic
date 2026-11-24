@@ -61,6 +61,15 @@ npm run check
 - Keep browser persistence behind `src/services/storage.js`. This avoids scattering `localStorage` calls throughout the game and gives us a clear place to add database sync later.
 - Add future shared leaderboard implementations behind `src/services/leaderboard.js` rather than coupling database calls directly to the UI.
 
+## Online music information
+
+The Music Explorer connects to two public catalog services when a visitor submits a search:
+
+- Wikipedia (MediaWiki Action API) for band and artist introductions, article links, and available images.
+- Apple Music / iTunes Search API for song artwork, album, artist, release date, genre, duration, and Apple Music links.
+
+Searches are manual rather than automatic while typing. Successful responses are cached in the visitor's browser for seven days. These lookups do not change game answers, daily selection, scores, or the local catalog. The feature degrades gracefully if a provider is unavailable. Apple documents an approximate limit of 20 Search API calls per minute, so avoid automated bulk lookups and keep the cache enabled.
+
 ## Current data and backend status
 
 The current game is still **frontend-only**. Theme preference, difficulty preferences, daily-round state, and personal stats remain in the visitor's browser using `localStorage`. There is no account system, live database connection, or shared leaderboard enabled in this starter repository.
