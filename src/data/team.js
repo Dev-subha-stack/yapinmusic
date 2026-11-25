@@ -13,6 +13,6 @@ export const TEAM = [
   { role: 'Marketing Manager', info: 'Outreach, partnerships and social media.', members: [] },
   { role: 'Site Developers', info: 'Build and maintain the YapinMusic website.', members: [
     { name: "I'm Groot", handle: '@iamgroot', avatar: '/assets/avatar-groot.webp' },
-    { name: 'sroy1_0', handle: '@Sroy1_0' }
+    { name: 'sroy1_0', handle: '@Sroy1_0', avatar: '/assets/avatar-sroy1-0.webp' }
   ] }
 ];
