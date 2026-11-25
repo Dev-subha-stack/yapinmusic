@@ -313,6 +313,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       card.appendChild(top);
       var facts = el('div', 'game-info-facts');
       [[b.type === 'artist' ? 'Active since' : 'Formed', b.y], ['Country', b.c], ['Genre', b.g], ['Yapin tracks', b.s.length], ['From', b.origin], ['Languages', b.languages]].forEach(function (item) {
+        if (item[1] == null || item[1] === '') return;
         var fact = el('div', 'game-info-fact');
         fact.appendChild(el('small', null, item[0]));
         fact.appendChild(el('b', null, String(item[1])));

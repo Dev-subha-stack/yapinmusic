@@ -50,12 +50,13 @@ export function lookup(value, list, keyOf, normalize = key) {
   const maxDistance = normalized.length >= 16 ? 2 : 1;
   const matches = [];
   for (const entry of entries) {
+    let bestDistance = Number.POSITIVE_INFINITY;
     for (const candidate of entry.keys) {
       if (!/^[a-z0-9]+$/.test(candidate)) continue;
       if (Math.abs(candidate.length - normalized.length) > maxDistance) continue;
-      const distance = levenshteinDistance(normalized, candidate);
-      if (distance <= maxDistance) matches.push({ item: entry.item, distance });
+      bestDistance = Math.min(bestDistance, levenshteinDistance(normalized, candidate));
     }
+    if (bestDistance <= maxDistance) matches.push({ item: entry.item, distance: bestDistance });
   }
   matches.sort((a, b) => a.distance - b.distance);
   if (!matches.length) return null;

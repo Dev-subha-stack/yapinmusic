@@ -131,7 +131,7 @@ export const BANDS = [
       ['Open Arms', 1981, 'Escape'], ['Wheel in the Sky', 1978, 'Infinity'], ['Lights', 1978, 'Infinity'], ["Lovin', Touchin', Squeezin'", 1979, 'Evolution'] ] },
     { n: 'Pearl Jam', c: 'USA', g: 'Grunge', f: 'Rock', y: 1990, s: [
       ['Alive', 1991, 'Ten'], ['Even Flow', 1991, 'Ten'], ['Jeremy', 1991, 'Ten'], ['Black', 1991, 'Ten'],
-      ['Daughter', 1993, 'Vs.'], ['Better Man', 1994, 'Vitalogy'], ['Given to Fly', 1998, 'Yield'], ['Last Kiss', 1999, 'Non-album single'] ] }
+      ['Daughter', 1993, 'Vs.'], ['Better Man', 1994, 'Vitalogy'], ['Given to Fly', 1998, 'Yield'], ['Last Kiss', 1999, 'Non-album single'] ] },
   
 
     { n: 'A. R. Rahman', c: 'India', g: 'Film score · Indian fusion · Electronic', f: 'Pop', y: 1992, type: 'artist', origin: 'Chennai, Tamil Nadu', languages: 'Tamil, Hindi, Telugu, Malayalam, English', aliases: ['AR Rahman', 'A R Rahman', 'Allah Rakha Rahman', 'ए आर रहमान', 'ஏ. ஆர். ரகுமான்'], bio: 'Indian composer, producer, singer and songwriter known for blending Indian classical and folk traditions with electronic, orchestral and global sounds. His major film-composing debut was Roja in 1992.', s: [

@@ -10,7 +10,7 @@ test('ignores a leading The when comparing band names', () => {
   assert.equal(sortLetter('The Beatles'), 'B');
 });
 test('preserves Bengali and Devanagari letters instead of deleting them', () => {
-  assert.equal(key('অরিজিৎ সিং'), 'অরিজিৎিসং'.replace('িস', 'িস'));
+  assert.equal(key('অরিজিৎ সিং'), 'অরিজিৎসিং');
   assert.equal(key('अरिजीत सिंह'), 'अरिजीतसिंह');
 });
 test('calculates edit distance', () => {
@@ -29,7 +29,7 @@ test('does not fuzzy-match very short guesses', () => {
   assert.equal(lookup('Qeen', ['ABBA', 'Queen'], key), null);
 });
 test('does not guess between equally close matches', () => {
-  assert.equal(lookup('queenss', ['Queen', 'Queens'], key), null);
+  assert.equal(lookup('metallicx', ['Metallica', 'Metallicb'], key), null);
   assert.equal(lookup('beatle', ['Beatles', 'Beatlesque'], key), null);
 });
 test('does not convert an unrelated long guess into a catalogue answer', () => {
