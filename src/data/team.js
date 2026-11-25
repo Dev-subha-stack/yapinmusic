@@ -10,5 +10,9 @@ export const TEAM = [
   { role: 'Trial Moderators', info: 'On a trial period with the moderation team.', members: [
     { name: 'frejablehhh', handle: '@frejablehhh', avatar: '/assets/avatar-freja.webp' }
   ] },
-  { role: 'Marketing Manager', info: 'Outreach, partnerships and social media.', members: [] }
+  { role: 'Marketing Manager', info: 'Outreach, partnerships and social media.', members: [] },
+  { role: 'Site Developers', info: 'Build and maintain the YapinMusic website.', members: [
+    { name: "I'm Groot", handle: '@iamgroot', avatar: '/assets/avatar-groot.webp' },
+    { name: 'sroy1_0', handle: '@Sroy1_0' }
+  ] }
 ];
