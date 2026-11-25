@@ -798,3 +798,20 @@ select {
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+
+/* ===== Indian music discovery shortcuts ===== */
+.music-featured { display: grid; gap: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg); }
+.music-featured h2 { font-size: 1.12rem; }
+.music-featured-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.music-featured-tags button {
+  min-height: 38px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--fg); font: 600 .86rem var(--f-body); cursor: pointer;
+}
+.music-featured-tags button:hover,
+.music-featured-tags button:focus-visible { border-color: var(--accent); background: var(--hover); }
+@media (max-width: 520px) {
+  .music-featured { padding: 13px; }
+  .music-featured-tags { gap: 7px; }
+  .music-featured-tags button { min-height: 40px; padding-inline: 11px; }
+}

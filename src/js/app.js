@@ -81,40 +81,86 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   });
   function songById(id) { for (var i = 0; i < SONGS.length; i++) if (SONGS[i].id === id) return SONGS[i]; return null; }
 
-  // Autocomplete: items = [{label, k, ref}], onSubmit(itemOrNull, typedText)
+  // Autocomplete: aliases are searched too; only meaningful fragments are suggested.
   function mkCombo(input, list, items, qNorm, onSubmit) {
     var cur = [], act = -1;
-    function hide() { list.hidden = true; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); act = -1; }
+    function hide() {
+      list.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+      act = -1;
+    }
     function setAct(i) {
       act = (i + cur.length) % cur.length;
-      Array.prototype.forEach.call(list.children, function (li, n) { li.setAttribute('aria-selected', String(n === act)); });
+      Array.prototype.forEach.call(list.children, function (li, n) {
+        li.setAttribute('aria-selected', String(n === act));
+      });
       input.setAttribute('aria-activedescendant', list.id + '-o' + act);
     }
     function render() {
       var q = qNorm(input.value);
-      list.innerHTML = ''; cur = []; act = -1;
+      list.innerHTML = '';
+      cur = [];
+      act = -1;
       if (q.length < 2) { hide(); return; }
-      var starts = [], inc = [];
-      items.forEach(function (it) { var p = it.k.indexOf(q); if (p === 0) starts.push(it); else if (p > 0) inc.push(it); });
-      cur = starts.concat(inc).slice(0, 7);
+      var ranked = [];
+      items.forEach(function (it) {
+        var keys = Array.isArray(it.keys) ? it.keys : [it.k];
+        var best = 0;
+        keys.forEach(function (candidate) {
+          if (!candidate) return;
+          if (candidate === q) best = Math.max(best, 120);
+          else if (candidate.indexOf(q) === 0) best = Math.max(best, 100);
+          else if (q.length >= 4 && candidate.indexOf(q) > 0) best = Math.max(best, 65);
+        });
+        if (best) ranked.push({ item: it, score: best });
+      });
+      ranked.sort(function (a, b) { return b.score - a.score; });
+      cur = ranked.slice(0, 7).map(function (entry) { return entry.item; });
       if (!cur.length) { hide(); return; }
       cur.forEach(function (it, i) {
-        var li = el('li', null, it.label); li.setAttribute('role', 'option'); li.id = list.id + '-o' + i; li.setAttribute('aria-selected', 'false');
-        li.addEventListener('pointerdown', function (e) { e.preventDefault(); input.value = ''; hide(); onSubmit(it, it.label); });
+        var li = el('li', null, it.label);
+        li.setAttribute('role', 'option');
+        li.id = list.id + '-o' + i;
+        li.setAttribute('aria-selected', 'false');
+        li.addEventListener('pointerdown', function (e) {
+          e.preventDefault();
+          input.value = '';
+          hide();
+          onSubmit(it, it.label);
+        });
         list.appendChild(li);
       });
-      list.hidden = false; input.setAttribute('aria-expanded', 'true');
+      list.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
     }
     input.addEventListener('input', render);
     input.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowDown' && cur.length && !list.hidden) { e.preventDefault(); setAct(act + 1); }
-      else if (e.key === 'ArrowUp' && cur.length && !list.hidden) { e.preventDefault(); setAct(act - 1); }
-      else if (e.key === 'Escape') { hide(); }
-      else if (e.key === 'Enter' && !list.hidden && act >= 0) { e.preventDefault(); var it = cur[act]; input.value = ''; hide(); onSubmit(it, it.label); }
+      if (e.key === 'ArrowDown' && cur.length && !list.hidden) {
+        e.preventDefault();
+        setAct(act + 1);
+      } else if (e.key === 'ArrowUp' && cur.length && !list.hidden) {
+        e.preventDefault();
+        setAct(act - 1);
+      } else if (e.key === 'Escape') {
+        hide();
+      } else if (e.key === 'Enter' && !list.hidden && (act >= 0 || cur.length === 1)) {
+        e.preventDefault();
+        var it = cur[act >= 0 ? act : 0];
+        input.value = '';
+        hide();
+        onSubmit(it, it.label);
+      }
     });
     input.addEventListener('blur', function () { setTimeout(hide, 150); });
     return {
-      submitTyped: function () { var t = input.value; if (!t.trim()) return; input.value = ''; hide(); onSubmit(null, t); },
+      submitTyped: function () {
+        var typed = input.value;
+        if (!typed.trim()) return;
+        input.value = '';
+        hide();
+        onSubmit(null, typed);
+      },
       hide: hide
     };
   }
@@ -170,8 +216,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   var SONG_LIVES = { easy: 8, medium: 6, hard: 4 };
   var BAND_TRIES = { easy: 9, medium: 7, hard: 5 };
   // Fame tiers: 1 = very famous, 2 = well known, 3 = deeper cuts. Easy uses only tier 1 bands and their top hits.
-  var T1 = ['Queen','Nirvana','Metallica','Coldplay','The Beatles','Led Zeppelin',"Guns N' Roses",'AC/DC','Linkin Park','Green Day','ABBA','Pink Floyd','Imagine Dragons','Maroon 5','Red Hot Chili Peppers','Oasis'];
-  var T3 = ['Ramones','The Clash','The Cure','Depeche Mode','Roxette','Journey','Scorpions','Gorillaz','Muse','Los Hermanos','Titãs','Sepultura','Paramore','Radiohead'];
+  var T1 = ['Queen','Nirvana','Metallica','Coldplay','The Beatles','Led Zeppelin',"Guns N' Roses",'AC/DC','Linkin Park','Green Day','ABBA','Pink Floyd','Imagine Dragons','Maroon 5','Red Hot Chili Peppers','Oasis','A. R. Rahman','Arijit Singh','Shreya Ghoshal','Lata Mangeshkar','Kishore Kumar','Diljit Dosanjh','The Local Train','Indian Ocean','Papon','Zubeen Garg','Bhupen Hazarika','Anuv Jain'];
+  var T3 = ['Ramones','The Clash','The Cure','Depeche Mode','Roxette','Journey','Scorpions','Gorillaz','Muse','Los Hermanos','Titãs','Sepultura','Paramore','Radiohead','Prateek Kuhad','Ritviz','When Chai Met Toast','Seedhe Maut'];
   var POOL_TIERS = { easy: [1], medium: [1, 2], hard: [2, 3] };
   var SONG_MAXIDX = { easy: 1, medium: 3, hard: 99 };
   function tierOf(b) { return T1.indexOf(b.n) >= 0 ? 1 : (T3.indexOf(b.n) >= 0 ? 3 : 2); }
@@ -231,14 +277,14 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     var gameInfoEl = $('[data-game-info]', root);
     var bandSpotlight = { name: '', data: null, loading: false, error: false };
 
-    var items = SONGS.map(function (s) { return { label: s.t, k: s.k, song: s }; });
+    var items = SONGS.map(function (s) { return { label: s.t, k: s.k, keys: [s.k], song: s }; });
     var hintBtn = $('[data-hint]', root);
     $('[data-surprise]', root).addEventListener('click', surpriseGame);
     hintBtn.addEventListener('click', function () {
       if (S.done || !canHint() || hintCount() >= HINT_CAP) return;
       S.hints++; save(); render();
     });
-    var combo = mkCombo(input, list, items, key, function (it, typed) { submit(it ? it.song : lookup(typed, SONGS, function (s) { return s.k; }, key)); });
+    var combo = mkCombo(input, list, items, key, function (it, typed) { submit(it ? it.song : lookup(typed, SONGS, function (s) { return [s.t].concat(s.aliases || []); }, key)); });
     form.addEventListener('submit', function (e) { e.preventDefault(); combo.submitTyped(); });
 
     function save() { if (S.mode === 'daily') ls.set(sk(), { g: S.guesses.map(function (g) { return g.id; }), counted: S.counted, h: S.hints }); }
@@ -255,7 +301,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var copy = el('div', 'game-info-copy');
       copy.appendChild(el('span', 'game-info-kicker', 'ARTIST SPOTLIGHT'));
       copy.appendChild(el('h2', null, b.n));
-      copy.appendChild(el('p', 'game-info-sub', 'A little background while you hunt for three hits.'));
+      copy.appendChild(el('p', 'game-info-sub', b.type === 'artist' ? 'Artist background and music notes.' : 'Band background and music notes.'));
       top.appendChild(copy);
       if (bandSpotlight.data && bandSpotlight.data.image) {
         var photo = el('img', 'game-info-image');
@@ -266,13 +312,14 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       }
       card.appendChild(top);
       var facts = el('div', 'game-info-facts');
-      [['Formed', b.y], ['Country', b.c], ['Genre', b.g], ['Yapin tracks', b.s.length]].forEach(function (item) {
+      [[b.type === 'artist' ? 'Active since' : 'Formed', b.y], ['Country', b.c], ['Genre', b.g], ['Yapin tracks', b.s.length], ['From', b.origin], ['Languages', b.languages]].forEach(function (item) {
         var fact = el('div', 'game-info-fact');
         fact.appendChild(el('small', null, item[0]));
         fact.appendChild(el('b', null, String(item[1])));
         facts.appendChild(fact);
       });
       card.appendChild(facts);
+      if (b.bio) card.appendChild(el('p', 'game-info-extract', b.bio));
       if (bandSpotlight.data && bandSpotlight.data.description) card.appendChild(el('p', 'game-info-sub', bandSpotlight.data.description));
       if (bandSpotlight.data && bandSpotlight.data.extract) card.appendChild(el('p', 'game-info-extract', bandSpotlight.data.extract));
       if (bandSpotlight.error) card.appendChild(el('p', 'game-info-note', 'Online artist information is unavailable. The built-in band facts above are still available.'));
@@ -523,7 +570,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     var trackSpotlight = { id: '', data: null, loading: false, error: false };
     var artistSpotlight = { name: '', data: null, loading: false, error: false };
 
-    var items = BANDS.map(function (b, i) { return { label: b.n, k: b.k, bi: i }; });
+    var items = BANDS.map(function (b, i) { return { label: b.n, k: b.k, keys: [b.k].concat((b.aliases || []).map(bandKey)), bi: i }; });
     var hintBtn = $('[data-hint]', root), hintsEl = $('[data-hints]', root);
     $('[data-surprise]', root).addEventListener('click', surpriseGame);
     hintBtn.addEventListener('click', function () {
@@ -532,7 +579,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     });
     var combo = mkCombo(input, list, items, bandKey, function (it, typed) {
       var bi = it ? it.bi : null;
-      if (bi == null) { var f = lookup(typed, BANDS, function (b) { return b.k; }, bandKey); bi = f ? BANDS.indexOf(f) : null; }
+      if (bi == null) { var f = lookup(typed, BANDS, function (b) { return [b.n].concat(b.aliases || []); }, bandKey); bi = f ? BANDS.indexOf(f) : null; }
       submit(bi);
     });
     form.addEventListener('submit', function (e) { e.preventDefault(); combo.submitTyped(); });
@@ -821,10 +868,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     var root = document.getElementById('v-explore');
     var kind = 'band', busy = false;
     function localBand(query) {
-      var normalized = bandKey(query);
-      return BANDS.find(function (b) {
-        return b.k === normalized || b.k.indexOf(normalized) >= 0 || normalized.indexOf(b.k) >= 0;
-      }) || null;
+      return lookup(query, BANDS, function (b) {
+        return [b.n].concat(b.aliases || []);
+      }, bandKey);
     }
     function addLink(parent, href, label, cls) {
       if (!href) return;
@@ -863,7 +909,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var card = el('article', 'music-info-card');
       var heading = el('div', 'music-info-heading');
       heading.appendChild(el('h2', null, (online && online.title) || (local && local.n) || query));
-      if (online && online.description) heading.appendChild(el('p', 'music-description', online.description));
+      if (local && local.bio) heading.appendChild(el('p', 'music-description', local.bio));
+      else if (online && online.description) heading.appendChild(el('p', 'music-description', online.description));
       card.appendChild(heading);
       if (online && online.image) {
         var image = el('img', 'music-cover');
@@ -874,9 +921,11 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       }
       if (local) {
         var facts = el('div', 'music-facts');
-        fact(facts, 'Formed', local.y);
+        fact(facts, local.type === 'artist' ? 'Active since' : 'Formed', local.y);
         fact(facts, 'Country', local.c);
         fact(facts, 'Genre', local.g);
+        fact(facts, 'From', local.origin);
+        fact(facts, 'Languages', local.languages);
         fact(facts, 'Songs in Yapin', local.s.length);
         card.appendChild(facts);
         var songs = el('div', 'music-catalog');
@@ -947,14 +996,41 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
               '<input type="search" data-explore-input placeholder="Search for a band or artist…" aria-label="Search music information" maxlength="120" autocomplete="off">' +
               '<button class="btn primary" type="submit" data-explore-submit>Search</button>' +
             '</form>' +
-            '<p class="music-muted">Search online when you press Search. Results are cached on this device for 7 days.</p>' +
+            '<section class="music-featured" aria-label="Explore Indian music">' +
+              '<div><h2>Explore Indian music</h2><p class="music-muted">Start with artists and bands from across India, including the Northeast.</p></div>' +
+              '<div class="music-featured-tags">' +
+                '<button type="button" data-featured-query="Arijit Singh">Arijit Singh</button>' +
+                '<button type="button" data-featured-query="A. R. Rahman">A. R. Rahman</button>' +
+                '<button type="button" data-featured-query="Shreya Ghoshal">Shreya Ghoshal</button>' +
+                '<button type="button" data-featured-query="Anuv Jain">Anuv Jain</button>' +
+                '<button type="button" data-featured-query="The Local Train">The Local Train</button>' +
+                '<button type="button" data-featured-query="Indian Ocean">Indian Ocean</button>' +
+                '<button type="button" data-featured-query="Papon">Papon</button>' +
+                '<button type="button" data-featured-query="Zubeen Garg">Zubeen Garg</button>' +
+                '<button type="button" data-featured-query="Bhupen Hazarika">Bhupen Hazarika</button>' +
+                '<button type="button" data-featured-query="When Chai Met Toast">When Chai Met Toast</button>' +
+              '</div>' +
+            '</section>' +
+            '<p class="music-muted">Online searches run only when you press Search. Results are cached on this device for 7 days.</p>' +
             '<p class="explore-status" data-explore-status role="status" aria-live="polite">Search for a band, artist or song to get started.</p>' +
             '<div class="explore-results" data-explore-results></div>' +
           '</div>' +
           '<p class="explore-credit">Band biographies are provided by Wikipedia. Song and album catalog details are supplied by Apple Music / iTunes Search.</p>' +
         '</div>';
       var input = $('[data-explore-input]', root);
-      $('[data-explore-form]', root).addEventListener('submit', async function (event) {
+      var exploreForm = $('[data-explore-form]', root);
+      root.querySelectorAll('[data-featured-query]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          kind = 'band';
+          root.querySelectorAll('[data-explore-type]').forEach(function (tab) {
+            tab.setAttribute('aria-pressed', String(tab.dataset.exploreType === kind));
+          });
+          input.placeholder = 'Search for a band or artist…';
+          input.value = button.dataset.featuredQuery;
+          exploreForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        });
+      });
+      exploreForm.addEventListener('submit', async function (event) {
         event.preventDefault();
         if (busy) return;
         var query = input.value.trim();
