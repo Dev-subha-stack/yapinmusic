@@ -734,3 +734,67 @@ h1 { letter-spacing: -.025em; }
     font-size: .86rem;
   }
 }
+
+
+/* ===== Remove browser-default blue touch and control highlights ===== */
+/* Android/Chromium can paint its own blue flash over links and controls.
+   Keep taps visually clean so the app's orange/plum palette stays consistent. */
+html,
+body,
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  accent-color: var(--accent);
+  scrollbar-color: var(--line) var(--bg);
+}
+
+button,
+input,
+textarea,
+select,
+a,
+summary,
+[role="button"],
+[role="tab"],
+[role="menuitem"] {
+  accent-color: var(--accent);
+  caret-color: var(--accent);
+}
+
+input,
+textarea,
+select {
+  caret-color: var(--accent);
+}
+
+/* Use the same warm selection colour in every theme/browser. */
+::selection {
+  background: var(--accent);
+  color: var(--btn-fg);
+}
+
+::-moz-selection {
+  background: var(--accent);
+  color: var(--btn-fg);
+}
+
+/* Keyboard navigation still gets a clear, on-brand focus indicator. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  a,
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  summary {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
