@@ -994,7 +994,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
               '<button type="button" data-explore-type="song" aria-pressed="false">Songs</button>' +
             '</div>' +
             '<form class="explore-search" data-explore-form>' +
-              '<input type="search" data-explore-input placeholder="Search for a band or artist…" aria-label="Search music information" maxlength="120" autocomplete="off">' +
+              '<div class="explore-combo">' +
+                '<input type="search" data-explore-input role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="explore-suggestions" placeholder="Search for a band or artist…" aria-label="Search music information" maxlength="120" autocomplete="off">' +
+                '<ul class="explore-suggestions" id="explore-suggestions" role="listbox" aria-label="Music suggestions" hidden></ul>' +
+              '</div>' +
               '<button class="btn primary" type="submit" data-explore-submit>Search</button>' +
             '</form>' +
             '<section class="music-featured" aria-label="Explore Indian music">' +
@@ -1012,7 +1015,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
                 '<button type="button" data-featured-query="When Chai Met Toast">When Chai Met Toast</button>' +
               '</div>' +
             '</section>' +
-            '<p class="music-muted">Online searches run only when you press Search. Results are cached on this device for 7 days.</p>' +
+            '<p class="music-muted">Start typing to see matching artists, bands and songs. Online searches run when you press Search. Results are cached on this device for 7 days.</p>' +
             '<p class="explore-status" data-explore-status role="status" aria-live="polite">Search for a band, artist or song to get started.</p>' +
             '<div class="explore-results" data-explore-results></div>' +
           '</div>' +
@@ -1020,19 +1023,132 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         '</div>';
       var input = $('[data-explore-input]', root);
       var exploreForm = $('[data-explore-form]', root);
+      var suggestionList = $('#explore-suggestions', root);
+      var allSuggestions = [];
+      var visibleSuggestions = [];
+      var activeSuggestion = -1;
+
+      // Build one local suggestion index for both artists/bands and catalog songs.
+      BANDS.forEach(function (band) {
+        var bandKeys = [band.n].concat(band.aliases || []).map(bandKey);
+        allSuggestions.push({
+          type: 'band', value: band.n, label: band.n,
+          detail: band.type === 'artist' ? 'Artist' : 'Band',
+          keys: bandKeys
+        });
+        band.s.forEach(function (song) {
+          allSuggestions.push({
+            type: 'song', value: song[0], label: song[0],
+            detail: band.n + ' · Song', keys: [key(song[0])]
+          });
+        });
+      });
+
+      function hideSuggestions() {
+        suggestionList.hidden = true;
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        activeSuggestion = -1;
+      }
+      function setSuggestionActive(index) {
+        if (!visibleSuggestions.length) return;
+        activeSuggestion = (index + visibleSuggestions.length) % visibleSuggestions.length;
+        Array.prototype.forEach.call(suggestionList.children, function (item, itemIndex) {
+          item.setAttribute('aria-selected', String(itemIndex === activeSuggestion));
+        });
+        input.setAttribute('aria-activedescendant', suggestionList.id + '-option-' + activeSuggestion);
+      }
+      function setExploreKind(nextKind, clearResults) {
+        kind = nextKind;
+        root.querySelectorAll('[data-explore-type]').forEach(function (tab) {
+          tab.setAttribute('aria-pressed', String(tab.dataset.exploreType === kind));
+        });
+        input.placeholder = kind === 'band' ? 'Search for a band or artist…' : 'Search for a song…';
+        if (clearResults) {
+          input.value = '';
+          $('[data-explore-results]', root).innerHTML = '';
+          setStatus(kind === 'band' ? 'Search for a band or artist to read its story.' : 'Search for a song to explore its album and release details.');
+        }
+      }
+      function chooseSuggestion(item) {
+        setExploreKind(item.type, false);
+        input.value = item.value;
+        hideSuggestions();
+        exploreForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }
+      function renderSuggestions() {
+        var query = key(input.value);
+        suggestionList.innerHTML = '';
+        visibleSuggestions = [];
+        activeSuggestion = -1;
+        input.removeAttribute('aria-activedescendant');
+        if (query.length < 2) { hideSuggestions(); return; }
+
+        var ranked = [];
+        allSuggestions.forEach(function (item) {
+          var score = 0;
+          item.keys.forEach(function (candidate) {
+            if (!candidate) return;
+            if (candidate === query) score = Math.max(score, 120);
+            else if (candidate.indexOf(query) === 0) score = Math.max(score, 100);
+            else if (query.length >= 3 && candidate.indexOf(query) > 0) score = Math.max(score, 70);
+          });
+          if (score) ranked.push({ item: item, score: score });
+        });
+        ranked.sort(function (a, b) {
+          return b.score - a.score || (a.item.type === b.item.type ? 0 : (a.item.type === 'band' ? -1 : 1));
+        });
+        visibleSuggestions = ranked.slice(0, 8).map(function (entry) { return entry.item; });
+        if (!visibleSuggestions.length) { hideSuggestions(); return; }
+
+        visibleSuggestions.forEach(function (item, index) {
+          var option = el('li', 'explore-suggestion');
+          option.id = suggestionList.id + '-option-' + index;
+          option.setAttribute('role', 'option');
+          option.setAttribute('aria-selected', 'false');
+          option.appendChild(el('span', 'explore-suggestion-name', item.label));
+          option.appendChild(el('span', 'explore-suggestion-type', item.detail));
+          option.addEventListener('pointerdown', function (event) {
+            event.preventDefault();
+            chooseSuggestion(item);
+          });
+          suggestionList.appendChild(option);
+        });
+        suggestionList.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+      }
+
+      input.addEventListener('input', renderSuggestions);
+      input.addEventListener('focus', renderSuggestions);
+      input.addEventListener('keydown', function (event) {
+        if (event.key === 'ArrowDown' && !suggestionList.hidden && visibleSuggestions.length) {
+          event.preventDefault();
+          setSuggestionActive(activeSuggestion + 1);
+        } else if (event.key === 'ArrowUp' && !suggestionList.hidden && visibleSuggestions.length) {
+          event.preventDefault();
+          setSuggestionActive(activeSuggestion < 0 ? visibleSuggestions.length - 1 : activeSuggestion - 1);
+        } else if (event.key === 'Escape') {
+          hideSuggestions();
+        } else if (event.key === 'Enter' && !suggestionList.hidden &&
+          (activeSuggestion >= 0 || visibleSuggestions.length === 1)) {
+          event.preventDefault();
+          chooseSuggestion(visibleSuggestions[activeSuggestion >= 0 ? activeSuggestion : 0]);
+        }
+      });
+      input.addEventListener('blur', function () {
+        window.setTimeout(hideSuggestions, 140);
+      });
       root.querySelectorAll('[data-featured-query]').forEach(function (button) {
         button.addEventListener('click', function () {
-          kind = 'band';
-          root.querySelectorAll('[data-explore-type]').forEach(function (tab) {
-            tab.setAttribute('aria-pressed', String(tab.dataset.exploreType === kind));
-          });
-          input.placeholder = 'Search for a band or artist…';
+          setExploreKind('band', false);
+          hideSuggestions();
           input.value = button.dataset.featuredQuery;
           exploreForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
         });
       });
       exploreForm.addEventListener('submit', async function (event) {
         event.preventDefault();
+        hideSuggestions();
         if (busy) return;
         var query = input.value.trim();
         if (!query) { setStatus('Enter a band, artist or song name first.'); input.focus(); return; }
@@ -1058,14 +1174,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       });
       root.querySelectorAll('[data-explore-type]').forEach(function (button) {
         button.addEventListener('click', function () {
-          kind = button.dataset.exploreType;
-          root.querySelectorAll('[data-explore-type]').forEach(function (item) {
-            item.setAttribute('aria-pressed', String(item.dataset.exploreType === kind));
-          });
-          input.placeholder = kind === 'band' ? 'Search for a band or artist…' : 'Search for a song…';
-          input.value = '';
-          $('[data-explore-results]', root).innerHTML = '';
-          setStatus(kind === 'band' ? 'Search for a band or artist to read its story.' : 'Search for a song to explore its album and release details.');
+          hideSuggestions();
+          setExploreKind(button.dataset.exploreType, true);
         });
       });
     }
