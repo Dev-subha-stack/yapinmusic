@@ -25,11 +25,19 @@ export async function requireNeonUser(req) {
     throw error;
   }
   const { jwks: keySet, expectedIssuer: issuer } = verifier();
-  const { payload } = await jwtVerify(match[1], keySet, {
-    algorithms: ['EdDSA'],
-    issuer,
-    audience: issuer
-  });
+  let payload;
+  try {
+    const verified = await jwtVerify(match[1], keySet, {
+      algorithms: ['EdDSA'],
+      issuer,
+      audience: issuer
+    });
+    payload = verified.payload;
+  } catch {
+    const error = new Error('Your Neon Auth session is invalid or has expired. Please sign in again.');
+    error.statusCode = 401;
+    throw error;
+  }
   if (typeof payload.sub !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.sub)) {
     const error = new Error('The sign-in token did not contain a valid player ID.');
     error.statusCode = 401;
