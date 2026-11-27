@@ -27,10 +27,16 @@
     <a href="#leaderboard" data-nav="leaderboard">Leaderboard</a>
     <a href="#our-team" data-nav="our-team">Our Team</a>
   </nav>
-  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
-    <span class="theme-icon" data-theme-icon aria-hidden="true">☾</span>
-    <span data-theme-label>Dark mode</span>
-  </button>
+  <div class="head-actions">
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">
+      <span class="theme-icon" data-theme-icon aria-hidden="true">☾</span>
+      <span data-theme-label>Dark mode</span>
+    </button>
+    <a class="profile-trigger" id="profile-trigger" href="#profile" aria-label="Open your player profile">
+      <span class="profile-trigger-avatar" data-profile-trigger-avatar aria-hidden="true">Y</span>
+      <span class="profile-trigger-label">Profile</span>
+    </a>
+  </div>
 </div></header>
 
 <main class="wrap">
@@ -126,32 +132,35 @@
           <span>Hard <b>200 pts</b></span>
         </div>
       </div>
-      <div class="lb-layout">
-        <section class="lb-panel lb-account-panel" aria-labelledby="lb-account-title">
-          <div class="lb-panel-head">
-            <div>
-              <p class="lb-eyebrow">YOUR PLAYER CARD</p>
-              <h2 id="lb-account-title">Join the leaderboard</h2>
-            </div>
-            <span class="lb-live-mark">OPTIONAL</span>
+      <section class="lb-panel lb-board-panel" aria-labelledby="lb-board-title">
+        <div class="lb-panel-head">
+          <div>
+            <p class="lb-eyebrow">THE COMMUNITY</p>
+            <h2 id="lb-board-title">Top players</h2>
           </div>
-          <div data-lb-account>
-            <p class="lb-muted">Loading account options…</p>
-          </div>
-        </section>
-        <section class="lb-panel lb-board-panel" aria-labelledby="lb-board-title">
-          <div class="lb-panel-head">
-            <div>
-              <p class="lb-eyebrow">THE COMMUNITY</p>
-              <h2 id="lb-board-title">Top players</h2>
-            </div>
-            <button class="btn" type="button" data-lb-refresh>Refresh</button>
-          </div>
-          <p class="lb-muted lb-board-note">Rank points come from Daily rounds only. Random rounds are unranked practice.</p>
-          <div data-lb-board>
-            <p class="lb-muted">Loading leaderboard…</p>
-          </div>
-        </section>
+          <button class="btn" type="button" data-lb-refresh>Refresh</button>
+        </div>
+        <p class="lb-muted lb-board-note">Rank points come from Daily rounds only. Random rounds are unranked practice.</p>
+        <div data-lb-board>
+          <p class="lb-muted">Loading leaderboard…</p>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- PLAYER PROFILE -->
+  <section id="v-profile" hidden="">
+    <div class="profile-page">
+      <div class="profile-page-head">
+        <div>
+          <p class="lb-eyebrow">YOUR YAPIN IDENTITY</p>
+          <h1>Your profile</h1>
+          <p class="lede">Personalise your player card with a photo, banner and a short bio.</p>
+        </div>
+        <a class="btn" href="#leaderboard">Back to leaderboard</a>
+      </div>
+      <div class="profile-panel" data-profile-panel>
+        <p class="lb-muted">Checking your player account…</p>
       </div>
     </div>
   </section>
