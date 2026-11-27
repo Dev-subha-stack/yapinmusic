@@ -6,6 +6,7 @@ import {
   getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername, saveProfileDetails,
   getLeaderboard, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured
 } from '../services/leaderboard.js';
+import { compressMediaFile, formatMediaBytes } from '../mediaCompressor.js';
 import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
 (function () {
@@ -1377,45 +1378,13 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       profileTrigger.classList.toggle('has-account', Boolean(accountState.user));
     }
 
-    function imageDataFromFile(file, width, height, maxLength) {
+    function fileToDataUrl(file) {
       return new Promise(function (resolve, reject) {
-        if (!file || !/^image\/(png|jpeg|webp)$/i.test(file.type)) {
-          reject(new Error('Choose a PNG, JPG or WebP image.'));
-          return;
-        }
-        var objectUrl = URL.createObjectURL(file);
-        var image = new Image();
-        image.onload = function () {
-          try {
-            var scale = Math.min(1, width / image.naturalWidth, height / image.naturalHeight);
-            var canvas = document.createElement('canvas');
-            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-            var context = canvas.getContext('2d');
-            if (!context) throw new Error('Your browser could not process this image.');
-            context.drawImage(image, 0, 0, canvas.width, canvas.height);
-            var quality = 0.86;
-            var data = canvas.toDataURL('image/jpeg', quality);
-            while (data.length > maxLength && quality > 0.42) {
-              quality -= 0.08;
-              data = canvas.toDataURL('image/jpeg', quality);
-            }
-            URL.revokeObjectURL(objectUrl);
-            if (data.length > maxLength) {
-              reject(new Error('This image is still too large. Try a smaller image.'));
-              return;
-            }
-            resolve(data);
-          } catch (error) {
-            URL.revokeObjectURL(objectUrl);
-            reject(error);
-          }
-        };
-        image.onerror = function () {
-          URL.revokeObjectURL(objectUrl);
-          reject(new Error('That image could not be opened.'));
-        };
-        image.src = objectUrl;
+        var reader = new FileReader();
+        reader.onload = function () { resolve(String(reader.result || '')); };
+        reader.onerror = function () { reject(new Error('Your browser could not read this image.')); };
+        reader.onabort = function () { reject(new Error('Image reading was cancelled.')); };
+        reader.readAsDataURL(file);
       });
     }
 
@@ -1508,6 +1477,14 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       coverPlaceholder.hidden = Boolean(profile.banner_url);
       cover.appendChild(coverImage);
       cover.appendChild(coverPlaceholder);
+      var bannerPicker = el('input');
+      bannerPicker.type = 'file';
+      bannerPicker.accept = 'image/png,image/jpeg,image/webp';
+      bannerPicker.hidden = true;
+      var bannerEditButton = el('button', 'profile-image-edit profile-banner-edit', 'Change banner');
+      bannerEditButton.type = 'button';
+      cover.appendChild(bannerEditButton);
+      cover.appendChild(bannerPicker);
       preview.appendChild(cover);
 
       var identity = el('div', 'profile-preview-identity');
@@ -1520,6 +1497,15 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       avatarFallback.hidden = Boolean(profile.avatar_url);
       avatarWrap.appendChild(avatarImage);
       avatarWrap.appendChild(avatarFallback);
+      var avatarPicker = el('input');
+      avatarPicker.type = 'file';
+      avatarPicker.accept = 'image/png,image/jpeg,image/webp';
+      avatarPicker.hidden = true;
+      var avatarEditButton = el('button', 'profile-image-edit profile-avatar-edit', 'Edit');
+      avatarEditButton.type = 'button';
+      avatarEditButton.setAttribute('aria-label', 'Change profile picture');
+      avatarWrap.appendChild(avatarEditButton);
+      avatarWrap.appendChild(avatarPicker);
       identity.appendChild(avatarWrap);
       var previewText = el('div', 'profile-preview-text');
       previewText.appendChild(el('strong', 'profile-preview-name', profile.username || accountState.user.name || 'Your player name'));
@@ -1550,56 +1536,231 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var avatarUrlField = field('Profile picture URL (optional)', 'text', 'https://…', 'url');
       avatarUrlField.input.value = profile.avatar_url || '';
       editor.appendChild(avatarUrlField.label);
-      var avatarFileField = field('Or upload a profile picture', 'file', '', 'off');
-      avatarFileField.input.accept = 'image/png,image/jpeg,image/webp';
-      avatarFileField.input.required = false;
-      editor.appendChild(avatarFileField.label);
-
       var bannerUrlField = field('Banner image URL (optional)', 'text', 'https://…', 'url');
       bannerUrlField.input.value = profile.banner_url || '';
       editor.appendChild(bannerUrlField.label);
-      var bannerFileField = field('Or upload a banner', 'file', '', 'off');
-      bannerFileField.input.accept = 'image/png,image/jpeg,image/webp';
-      bannerFileField.input.required = false;
-      editor.appendChild(bannerFileField.label);
+
+      var compressionBox = el('div', 'profile-compression-status');
+      compressionBox.hidden = true;
+      editor.appendChild(compressionBox);
+      var pendingAvatarData = null;
+      var pendingBannerData = null;
+      var avatarPreviewSource = profile.avatar_url || '';
+      var bannerPreviewSource = profile.banner_url || '';
+      var avatarObjectUrl = null;
+      var bannerObjectUrl = null;
+      var compressingImage = false;
+
+      function setCompressionStatus(state) {
+        compressionBox.hidden = false;
+        compressionBox.innerHTML = '';
+        compressionBox.className = 'profile-compression-status ' + (state.phase === 'error' ? 'is-error' : (state.phase === 'done' ? 'is-done' : 'is-active'));
+        var top = el('div', 'profile-compression-top');
+        top.appendChild(el('strong', null, state.phase === 'error' ? 'Image upload problem' : (state.phase === 'done' ? 'Image ready' : 'Compressing on this device…')));
+        top.appendChild(el('span', null, Math.round(state.progress || 0) + '%'));
+        compressionBox.appendChild(top);
+        var track = el('div', 'profile-compression-track');
+        var fill = el('span');
+        fill.style.width = Math.max(3, Math.min(100, Number(state.progress) || 0)) + '%';
+        track.appendChild(fill);
+        compressionBox.appendChild(track);
+        compressionBox.appendChild(el('p', null, state.message || ''));
+        if (state.originalSize != null) {
+          compressionBox.appendChild(el('small', null,
+            'Original: ' + formatMediaBytes(state.originalSize) + ' · Final: ' +
+            formatMediaBytes(state.outputSize == null ? state.originalSize : state.outputSize) +
+            (state.savedBytes > 0 ? ' · Saved ' + formatMediaBytes(state.savedBytes) : '')
+          ));
+        }
+      }
+
+      function revokeObjectUrl(kind) {
+        if (kind === 'avatar' && avatarObjectUrl) {
+          URL.revokeObjectURL(avatarObjectUrl);
+          avatarObjectUrl = null;
+        }
+        if (kind === 'banner' && bannerObjectUrl) {
+          URL.revokeObjectURL(bannerObjectUrl);
+          bannerObjectUrl = null;
+        }
+      }
+
+      function updateLiveHeaderAvatar(source) {
+        if (!triggerAvatar) return;
+        triggerAvatar.innerHTML = '';
+        if (source) {
+          var headerImage = el('img');
+          headerImage.src = source;
+          headerImage.alt = '';
+          headerImage.onerror = function () {
+            triggerAvatar.innerHTML = '';
+            triggerAvatar.textContent = initials(usernameField.input.value);
+          };
+          triggerAvatar.appendChild(headerImage);
+        } else {
+          triggerAvatar.textContent = initials(usernameField.input.value);
+        }
+      }
 
       function updatePreview() {
         previewText.querySelector('.profile-preview-name').textContent = usernameField.input.value.trim() || 'Your player name';
         previewBio.textContent = bioInput.value.trim() || 'Your bio will appear here. Tell the community a little about yourself.';
-        var avatarUrl = avatarUrlField.input.value.trim();
+        var avatarUrl = avatarPreviewSource || avatarUrlField.input.value.trim();
         avatarImage.hidden = !avatarUrl;
         avatarFallback.hidden = Boolean(avatarUrl);
         avatarFallback.textContent = initials(usernameField.input.value);
         if (avatarUrl) avatarImage.src = avatarUrl;
-        var bannerUrl = bannerUrlField.input.value.trim();
+        var bannerUrl = bannerPreviewSource || bannerUrlField.input.value.trim();
         coverImage.hidden = !bannerUrl;
         coverPlaceholder.hidden = Boolean(bannerUrl);
         if (bannerUrl) coverImage.src = bannerUrl;
+        updateLiveHeaderAvatar(avatarUrl);
       }
+
+      async function processProfileImage(file, kind) {
+        if (!file) return;
+        if (!/^image\/(png|jpeg|webp)$/i.test(file.type)) {
+          setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose a PNG, JPG or WebP image.' });
+          toast('Choose a PNG, JPG or WebP image.');
+          return;
+        }
+        if (file.size > 20 * 1024 * 1024) {
+          setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose an image smaller than 20 MB.' });
+          toast('Choose an image smaller than 20 MB.');
+          return;
+        }
+
+        var isAvatar = kind === 'avatar';
+        var maxStoredBytes = isAvatar ? 450 * 1024 : 1.2 * 1024 * 1024;
+        var maxDataLength = isAvatar ? 900000 : 1800000;
+        var currentPreviewUrl = URL.createObjectURL(file);
+        revokeObjectUrl(kind);
+        if (isAvatar) {
+          avatarObjectUrl = currentPreviewUrl;
+          avatarPreviewSource = currentPreviewUrl;
+          avatarUrlField.input.value = '';
+          pendingAvatarData = null;
+        } else {
+          bannerObjectUrl = currentPreviewUrl;
+          bannerPreviewSource = currentPreviewUrl;
+          bannerUrlField.input.value = '';
+          pendingBannerData = null;
+        }
+        updatePreview();
+        compressingImage = true;
+        avatarEditButton.disabled = true;
+        bannerEditButton.disabled = true;
+        setCompressionStatus({
+          phase: 'compressing',
+          progress: 1,
+          originalSize: file.size,
+          outputSize: file.size,
+          message: (isAvatar ? 'Profile photo' : 'Profile banner') + ' · Preparing image…'
+        });
+
+        try {
+          var result = await compressMediaFile(file, {
+            maxDimension: isAvatar ? 512 : 1800,
+            cropSquare: isAvatar,
+            quality: isAvatar ? 0.86 : 0.82,
+            targetBytes: maxStoredBytes,
+            onProgress: function (state) {
+              setCompressionStatus({
+                ...state,
+                message: (isAvatar ? 'Profile photo · ' : 'Profile banner · ') + (state.message || '')
+              });
+            }
+          });
+          var chosen = result.file;
+          if (!/^image\/(webp|png|jpeg)$/i.test(chosen.type)) {
+            throw new Error('This image format cannot be stored. Choose PNG, JPG or WebP.');
+          }
+          if (chosen.size > maxStoredBytes) {
+            throw new Error('After compression this image is still ' + formatMediaBytes(chosen.size) + '. Try a smaller image.');
+          }
+          var dataUrl = await fileToDataUrl(chosen);
+          if (dataUrl.length > maxDataLength) {
+            throw new Error('The compressed image is still too large. Try a smaller image.');
+          }
+          var compressedPreview = URL.createObjectURL(chosen);
+          revokeObjectUrl(kind);
+          if (isAvatar) {
+            avatarObjectUrl = compressedPreview;
+            avatarPreviewSource = compressedPreview;
+            pendingAvatarData = dataUrl;
+          } else {
+            bannerObjectUrl = compressedPreview;
+            bannerPreviewSource = compressedPreview;
+            pendingBannerData = dataUrl;
+          }
+          updatePreview();
+          setCompressionStatus({
+            phase: 'done',
+            progress: 100,
+            originalSize: file.size,
+            outputSize: chosen.size,
+            savedBytes: Math.max(0, file.size - chosen.size),
+            message: (isAvatar ? 'Profile photo' : 'Profile banner') + ' is compressed and ready to save.'
+          });
+          toast((isAvatar ? 'Profile picture' : 'Banner') + ' ready to save.');
+        } catch (error) {
+          revokeObjectUrl(kind);
+          if (isAvatar) {
+            pendingAvatarData = null;
+            avatarPreviewSource = '';
+            avatarUrlField.input.value = profile.avatar_url || '';
+            avatarPicker.value = '';
+          } else {
+            pendingBannerData = null;
+            bannerPreviewSource = '';
+            bannerUrlField.input.value = profile.banner_url || '';
+            bannerPicker.value = '';
+          }
+          updatePreview();
+          setCompressionStatus({ phase: 'error', progress: 100, message: error.message || 'Could not process that image.' });
+          toast(error.message || 'Could not process that image.');
+        } finally {
+          compressingImage = false;
+          avatarEditButton.disabled = false;
+          bannerEditButton.disabled = false;
+        }
+      }
+
+      avatarEditButton.addEventListener('click', function () { avatarPicker.click(); });
+      bannerEditButton.addEventListener('click', function () { bannerPicker.click(); });
+      avatarPicker.addEventListener('change', function () {
+        var selected = avatarPicker.files && avatarPicker.files[0];
+        processProfileImage(selected, 'avatar');
+        avatarPicker.value = '';
+      });
+      bannerPicker.addEventListener('change', function () {
+        var selected = bannerPicker.files && bannerPicker.files[0];
+        processProfileImage(selected, 'banner');
+        bannerPicker.value = '';
+      });
+
       usernameField.input.addEventListener('input', updatePreview);
       bioInput.addEventListener('input', function () {
         editor.querySelector('.profile-char-count').textContent = bioInput.value.length + '/160 characters';
         updatePreview();
       });
-      avatarUrlField.input.addEventListener('input', updatePreview);
-      bannerUrlField.input.addEventListener('input', updatePreview);
-      avatarFileField.input.addEventListener('change', async function () {
-        var file = avatarFileField.input.files && avatarFileField.input.files[0];
-        if (!file) return;
-        try {
-          avatarUrlField.input.value = await imageDataFromFile(file, 512, 512, 900000);
-          updatePreview();
-          toast('Profile picture ready to save.');
-        } catch (error) { toast(error.message || 'Could not process that image.'); }
+      avatarUrlField.input.addEventListener('input', function () {
+        pendingAvatarData = null;
+        revokeObjectUrl('avatar');
+        avatarPreviewSource = avatarUrlField.input.value.trim();
+        updatePreview();
       });
-      bannerFileField.input.addEventListener('change', async function () {
-        var file = bannerFileField.input.files && bannerFileField.input.files[0];
-        if (!file) return;
-        try {
-          bannerUrlField.input.value = await imageDataFromFile(file, 1440, 520, 1800000);
-          updatePreview();
-          toast('Banner ready to save.');
-        } catch (error) { toast(error.message || 'Could not process that image.'); }
+      bannerUrlField.input.addEventListener('input', function () {
+        pendingBannerData = null;
+        revokeObjectUrl('banner');
+        bannerPreviewSource = bannerUrlField.input.value.trim();
+        updatePreview();
+      });
+      updatePreview();
+
+      editor.addEventListener('reset', function () {
+        revokeObjectUrl('avatar');
+        revokeObjectUrl('banner');
       });
 
       var saveMessage = el('p', 'lb-message');
@@ -1611,14 +1772,18 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       editor.appendChild(actions);
       editor.addEventListener('submit', async function (event) {
         event.preventDefault();
+        if (compressingImage) {
+          setMessage(saveMessage, 'Wait for image compression to finish before saving.', true);
+          return;
+        }
         saveButton.disabled = true;
         setMessage(saveMessage, 'Saving your player card…', false);
         try {
           await saveProfileDetails({
             username: usernameField.input.value,
             bio: bioInput.value,
-            avatarUrl: avatarUrlField.input.value.trim() || null,
-            bannerUrl: bannerUrlField.input.value.trim() || null
+            avatarUrl: pendingAvatarData || avatarUrlField.input.value.trim() || null,
+            bannerUrl: pendingBannerData || bannerUrlField.input.value.trim() || null
           });
           setMessage(saveMessage, 'Your player card has been updated.', false);
           toast('Profile saved!');
