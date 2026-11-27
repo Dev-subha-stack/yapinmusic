@@ -72,22 +72,39 @@ Searches are manual rather than automatic while typing. Successful responses are
 
 ## Accounts, leaderboard, and ranks
 
-Gameplay remains open to guests. An account is optional and is only needed when a player wants a public name on the shared leaderboard. Email/password sign-up and sign-in are handled by Supabase Auth; the public profile contains only the chosen username.
+The shared leaderboard and authentication are powered by a dedicated Neon project. Players can play every round as guests. An account is optional and is only needed to publish a public player name.
 
-Only **Daily** rounds contribute ranked results. A win awards 100 points on Easy, 150 on Medium, or 200 on Hard. Random rounds remain practice-only. A player can submit one result per game mode, difficulty, and daily puzzle date. The server calculates fixed point values and browser clients cannot insert or edit score rows directly. The win/loss outcome is still reported by the browser, so treat this as a casual community leaderboard rather than a tamper-proof competitive ranking system. Results are queued locally so a player can finish a Daily round as a guest, sign in later, and then publish that result.
+Only Daily rounds count towards ranked points: Easy wins = 100, Medium wins = 150, and Hard wins = 200. Random rounds stay unranked. Each user can submit one result per game mode, difficulty, and daily puzzle date. Scores are assigned on the server and authenticated with Neon Managed Better Auth. Guest Daily results are queued locally and can be uploaded after the player signs in.
 
 Ranks are based on total points: Rookie Listener (0), Bronze Listener (300), Silver Listener (750), Gold Listener (1,500), Platinum Listener (2,500), Diamond Listener (4,000), and Legend (6,000).
 
-### Connect the backend
+### Neon project
 
-The repository includes the migration at `supabase/migrations/20261124000000_initial_schema.sql` and the authenticated score function at `supabase/functions/submit-score/index.ts`. They must be applied/deployed to a **dedicated YapinMusic Supabase project**; do not reuse a project belonging to another app.
+- Project: `yapinmusic`
+- Region: `aws-ap-southeast-1` (Singapore)
+- Database: `yapinmusic`
+- Authentication: Neon Managed Better Auth (email/password)
+- Schema migration: `neon/migrations/20261127000000_leaderboard.sql`
 
-1. Create a Supabase project, then run the SQL migration in its SQL Editor (or apply it with the Supabase CLI).
-2. Deploy the Edge Function: `supabase functions deploy submit-score`. Keep JWT verification enabled.
-3. In Vercel project settings, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` using the project's URL and public anon/publishable key. The service-role key must never be exposed to the browser.
-4. Redeploy the Vercel site after setting the environment variables.
+The Neon database stores public player names and daily scores. User identity and sessions are managed by Neon Auth. The database connection string is server-only and is used by Vercel API routes, never shipped to browser code.
 
-Without those backend steps, the site continues to work as a guest game and shows that the shared leaderboard is not connected yet.
+### Environment variables
+
+Set these in Vercel for Production, Preview, and Development:
+
+- `VITE_NEON_AUTH_URL`: the public Neon Auth base URL used by the browser client
+- `NEON_AUTH_BASE_URL`: the same Auth URL, used server-side to verify tokens with Neon JWKS
+- `DATABASE_URL`: the pooled Neon Postgres connection string, server-only
+
+For local development, copy `.env.example` to `.env.local` and fill in `DATABASE_URL`. Do not commit database credentials.
+
+### API routes
+
+- `GET /api/leaderboard`: public read of ranked players
+- `GET /api/profile`: authenticated player card
+- `POST /api/profile`: create or update the public player name
+- `POST /api/submit-score`: verifies the Neon Auth JWT and records one Daily result
+
 
 ## Development notes
 
