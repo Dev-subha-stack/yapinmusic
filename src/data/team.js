@@ -11,8 +11,7 @@ export const TEAM = [
     { name: 'frejablehhh', handle: '@frejablehhh', avatar: '/assets/avatar-freja.webp' }
   ] },
   { role: 'Site Developers', info: 'Build and maintain the YapinMusic website.', members: [
-    { name: 'sroy1_0', handle: '@Sroy1_0', avatar: '/assets/avatar-sroy1-0.webp' },
-    { name: "I'm Groot", handle: '@iamgroot', avatar: '/assets/avatar-groot.webp' }
+    { name: 'sroy1_0', handle: '@Sroy1_0', avatar: '/assets/avatar-sroy1-0.webp', profileUserId: '52e09b47-ce97-486a-a62a-cf8ecf76bf0a' }
   ] },
   { role: 'Marketing Manager', info: 'Outreach, partnerships and social media.', members: [] }
 ];
