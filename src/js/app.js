@@ -894,7 +894,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       hintBtn.textContent = n >= HINT_CAP ? 'No more hints' : (S.diff === 'medium' ? 'Give me a hint (costs 1 guess)' : 'Give me a hint (free)');
       if (S.done) { hintsEl.hidden = true; return; }
       hintsEl.hidden = false;
-      hintsEl.appendChild(el('div', 'lbl', 'Hints'));
       hintsEl.appendChild(el('div', 'lbl', 'Hints (' + n + '/' + HINT_CAP + ')'));
       if (!n) { hintsEl.appendChild(el('p', null, 'Wrong guesses unlock up to three hints about the band.' + (S.diff !== 'hard' ? ' Stuck? Tap “Give me a hint”.' : ''))); return; }
       var ul = el('ul'), all = hintList();
