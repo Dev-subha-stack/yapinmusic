@@ -2233,7 +2233,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var groupToggle = event.target.closest('[data-menu-toggle]');
       if (groupToggle && mobileNav.contains(groupToggle)) {
         var group = groupToggle.closest('[data-menu-group]');
-        setMenuGroupOpen(group, groupToggle.getAttribute('aria-expanded') !== 'true');
+        setMenuGroupOpen(group, navCanHover() ? true : groupToggle.getAttribute('aria-expanded') !== 'true');
         return;
       }
       if (event.target.closest('a[data-nav]')) closeMobileNav();
@@ -2249,11 +2249,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       if (!navCanHover()) return;
       var group = event.target.closest('[data-menu-group]');
       if (group && !group.contains(event.relatedTarget)) closeMenuGroup(group);
-    });
-
-    mobileNav.addEventListener('focusin', function (event) {
-      var group = event.target.closest('[data-menu-group]');
-      if (group) setMenuGroupOpen(group, true);
     });
 
     mobileNav.addEventListener('focusout', function (event) {
