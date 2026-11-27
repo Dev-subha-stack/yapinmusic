@@ -340,12 +340,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
   function gameSong() {
     var root = document.getElementById('v-song');
-    var HINT_CAP = 9, orders = {};
+    var HINT_CAP = 3, orders = {};
     var S = { mode: 'daily', diff: getDiff('song'), bi: 0, guesses: [], done: false, won: false, counted: false, hints: 0, roundId: null };
     var NOTES = {
-      easy: '8 lives · the most famous bands · free hint button',
-      medium: '6 lives · well-known bands · hint button costs 1 life',
-      hard: '4 lives · deeper cuts · less info about the band'
+      easy: '8 lives · famous bands · 3 hints · free hint button',
+      medium: '6 lives · well-known bands · 3 hints · button costs 1 life',
+      hard: '4 lives · deeper cuts · 3 hints unlock on misses'
     };
     function orderFor(d) { if (!orders[d]) orders[d] = shuffledOrder(bandPool(d).length, 20260 + DIFFS.indexOf(d)); return orders[d]; }
     function lives() { return SONG_LIVES[S.diff]; }
@@ -484,7 +484,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       $('[data-mode="daily"]', root).setAttribute('aria-pressed', String(mode === 'daily'));
       $('[data-mode="random"]', root).setAttribute('aria-pressed', String(mode === 'random'));
       root.querySelectorAll('[data-diff]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.diff === S.diff)); });
-      diffNote.textContent = NOTES[S.diff] + ' · every miss unlocks a hint';
+      diffNote.textContent = NOTES[S.diff] + ' · maximum 3 hints per round';
       statLbl.textContent = 'Your stats · ' + DIFF_NAME[S.diff];
       resultEl.hidden = true;
       render(); statsRender(statsEl, sKey());
@@ -563,10 +563,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       clue.innerHTML = '';
       if (S.done) { clue.hidden = true; updateHintBtn(); return; }
       clue.hidden = false;
-      clue.appendChild(el('div', 'lbl', 'Hints'));
       var n = hintCount();
+      clue.appendChild(el('div', 'lbl', 'Hints (' + n + '/' + HINT_CAP + ')'));
       if (!n) {
-        clue.appendChild(el('p', null, 'Every miss unlocks a new hint about one of the hits.' + (S.diff !== 'hard' ? ' Stuck? Tap “Give me a hint”.' : '')));
+        clue.appendChild(el('p', null, 'Wrong guesses unlock up to three hints about one of the hits.' + (S.diff !== 'hard' ? ' Stuck? Tap “Give me a hint”.' : '')));
         updateHintBtn(); return;
       }
       var all = hintItems(n), ul = el('ul');
@@ -649,12 +649,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
   function gameBand() {
     var root = document.getElementById('v-band');
-    var HINT_CAP = 8, orders = {};
+    var HINT_CAP = 3, orders = {};
     var S = { mode: 'daily', diff: getDiff('band'), song: null, guesses: [], done: false, won: false, counted: false, hints: 0, roundId: null };
     var NOTES = {
-      easy: '9 guesses · the most famous songs · free hint button',
-      medium: '7 guesses · well-known songs · hint button costs 1 guess',
-      hard: '5 guesses · deeper cuts · release year hidden'
+      easy: '9 guesses · famous songs · 3 hints · free hint button',
+      medium: '7 guesses · well-known songs · 3 hints · button costs 1 guess',
+      hard: '5 guesses · deeper cuts · 3 hints unlock on misses'
     };
     function orderFor(d) { if (!orders[d]) orders[d] = shuffledOrder(songPool(d).length, 77030 + DIFFS.indexOf(d)); return orders[d]; }
     function maxG() { return BAND_TRIES[S.diff]; }
@@ -863,7 +863,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       $('[data-mode="daily"]', root).setAttribute('aria-pressed', String(mode === 'daily'));
       $('[data-mode="random"]', root).setAttribute('aria-pressed', String(mode === 'random'));
       root.querySelectorAll('[data-diff]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.diff === S.diff)); });
-      diffNote.textContent = NOTES[S.diff] + ' · every wrong guess unlocks a hint';
+      diffNote.textContent = NOTES[S.diff] + ' · maximum 3 hints per round';
       statLbl.textContent = 'Your stats · ' + DIFF_NAME[S.diff];
       resultEl.hidden = true;
       render(); statsRender(statsEl, sKey());
@@ -895,7 +895,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       if (S.done) { hintsEl.hidden = true; return; }
       hintsEl.hidden = false;
       hintsEl.appendChild(el('div', 'lbl', 'Hints'));
-      if (!n) { hintsEl.appendChild(el('p', null, 'Every wrong guess unlocks a new hint about the band.' + (S.diff !== 'hard' ? ' Stuck? Tap “Give me a hint”.' : ''))); return; }
+      hintsEl.appendChild(el('div', 'lbl', 'Hints (' + n + '/' + HINT_CAP + ')'));
+      if (!n) { hintsEl.appendChild(el('p', null, 'Wrong guesses unlock up to three hints about the band.' + (S.diff !== 'hard' ? ' Stuck? Tap “Give me a hint”.' : ''))); return; }
       var ul = el('ul'), all = hintList();
       for (var i = 0; i < n; i++) {
         var li = el('li', i === n - 1 ? 'new' : null); li.appendChild(el('b', null, all[i][0] + ':')); li.appendChild(document.createTextNode(all[i][1])); ul.appendChild(li);
