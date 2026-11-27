@@ -1479,7 +1479,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       cover.appendChild(coverPlaceholder);
       var bannerPicker = el('input', 'profile-file-input');
       bannerPicker.type = 'file';
-      bannerPicker.accept = 'image/*';
+      bannerPicker.accept = 'image/png,image/jpeg,image/webp,image/gif';
       bannerPicker.setAttribute('aria-label', 'Choose a profile banner from your computer');
       var bannerEditButton = el('label', 'profile-image-edit profile-banner-edit', 'Change banner');
       bannerEditButton.appendChild(bannerPicker);
@@ -1498,7 +1498,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       avatarWrap.appendChild(avatarFallback);
       var avatarPicker = el('input', 'profile-file-input');
       avatarPicker.type = 'file';
-      avatarPicker.accept = 'image/*';
+      avatarPicker.accept = 'image/png,image/jpeg,image/webp,image/gif';
       avatarPicker.setAttribute('aria-label', 'Choose a profile picture from your computer');
       var avatarEditButton = el('label', 'profile-image-edit profile-avatar-edit', 'Edit');
       avatarEditButton.appendChild(avatarPicker);
@@ -1530,16 +1530,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       editor.appendChild(bioLabel);
       editor.appendChild(el('p', 'profile-char-count', (bioInput.value.length) + '/160 characters'));
 
-      var avatarUrlField = field('Profile picture URL (optional)', 'text', 'https://…', 'url');
-      avatarUrlField.input.required = false;
-      avatarUrlField.input.removeAttribute('required');
-      avatarUrlField.input.value = profile.avatar_url || '';
-      editor.appendChild(avatarUrlField.label);
-      var bannerUrlField = field('Banner image URL (optional)', 'text', 'https://…', 'url');
-      bannerUrlField.input.required = false;
-      bannerUrlField.input.removeAttribute('required');
-      bannerUrlField.input.value = profile.banner_url || '';
-      editor.appendChild(bannerUrlField.label);
+      editor.appendChild(el('p', 'profile-image-help', 'Choose images directly from your computer. No image links needed.'));
 
       var compressionBox = el('div', 'profile-compression-status');
       compressionBox.hidden = true;
@@ -1606,12 +1597,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       function updatePreview() {
         previewText.querySelector('.profile-preview-name').textContent = usernameField.input.value.trim() || 'Your player name';
         previewBio.textContent = bioInput.value.trim() || 'Your bio will appear here. Tell the community a little about yourself.';
-        var avatarUrl = avatarPreviewSource || avatarUrlField.input.value.trim();
+        var avatarUrl = avatarPreviewSource;
         avatarImage.hidden = !avatarUrl;
         avatarFallback.hidden = Boolean(avatarUrl);
         avatarFallback.textContent = initials(usernameField.input.value);
         if (avatarUrl) avatarImage.src = avatarUrl;
-        var bannerUrl = bannerPreviewSource || bannerUrlField.input.value.trim();
+        var bannerUrl = bannerPreviewSource;
         coverImage.hidden = !bannerUrl;
         coverPlaceholder.hidden = Boolean(bannerUrl);
         if (bannerUrl) coverImage.src = bannerUrl;
@@ -1620,9 +1611,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
       function selectProfileImage(file, kind) {
         if (!file) return;
-        if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
-          setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose a regular photo such as JPG, PNG, WebP, AVIF or GIF.' });
-          toast('Please choose a photo image (JPG, PNG, WebP, AVIF or GIF).');
+        if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type)) {
+          setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose a JPG, PNG, WebP or GIF image.' });
+          toast('Please choose a JPG, PNG, WebP or GIF image.');
           return;
         }
         if (file.size > 20 * 1024 * 1024) {
@@ -1638,12 +1629,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           selectedAvatarFile = file;
           avatarObjectUrl = objectUrl;
           avatarPreviewSource = objectUrl;
-          avatarUrlField.input.value = '';
         } else {
           selectedBannerFile = file;
           bannerObjectUrl = objectUrl;
           bannerPreviewSource = objectUrl;
-          bannerUrlField.input.value = '';
         }
         updatePreview();
 
@@ -1700,18 +1689,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         editor.querySelector('.profile-char-count').textContent = bioInput.value.length + '/160 characters';
         updatePreview();
       });
-      avatarUrlField.input.addEventListener('input', function () {
-        selectedAvatarFile = null;
-        revokeObjectUrl('avatar');
-        avatarPreviewSource = avatarUrlField.input.value.trim();
-        updatePreview();
-      });
-      bannerUrlField.input.addEventListener('input', function () {
-        selectedBannerFile = null;
-        revokeObjectUrl('banner');
-        bannerPreviewSource = bannerUrlField.input.value.trim();
-        updatePreview();
-      });
       updatePreview();
 
       var saveMessage = el('p', 'lb-message');
@@ -1727,8 +1704,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         saveButton.disabled = true;
         compressingImage = true;
         try {
-          var avatarData = avatarUrlField.input.value.trim() || null;
-          var bannerData = bannerUrlField.input.value.trim() || null;
+          var avatarData = null;
+          var bannerData = null;
           if (selectedAvatarFile || selectedBannerFile) {
             setMessage(saveMessage, 'Compressing your images before upload…', false);
             if (selectedAvatarFile) avatarData = await compressSelectedImage(selectedAvatarFile, 'avatar');
@@ -1738,8 +1715,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           await saveProfileDetails({
             username: usernameField.input.value,
             bio: bioInput.value,
-            avatarUrl: avatarData,
-            bannerUrl: bannerData
+            avatarData: avatarData,
+            bannerData: bannerData
           });
           setMessage(saveMessage, 'Your player card has been updated.', false);
           toast('Profile saved!');
