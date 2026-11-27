@@ -16,7 +16,7 @@ function validImage(value, maxLength) {
   if (value == null || value === '') return null;
   const image = String(value).trim();
   if (image.length > maxLength) return null;
-  if (/^data:image\/(?:png|jpe?g|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(image)) return image;
+  if (/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(image)) return image;
   try {
     const url = new URL(image);
     return url.protocol === 'https:' && url.hostname ? image : null;
