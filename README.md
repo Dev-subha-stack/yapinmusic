@@ -74,7 +74,7 @@ Searches are manual rather than automatic while typing. Successful responses are
 
 Gameplay remains open to guests. An account is optional and is only needed when a player wants a public name on the shared leaderboard. Email/password sign-up and sign-in are handled by Supabase Auth; the public profile contains only the chosen username.
 
-Only **Daily** rounds contribute ranked results. A win awards 100 points on Easy, 150 on Medium, or 200 on Hard. Random rounds remain practice-only. A player can submit one result per game mode, difficulty, and daily puzzle date. The server assigns the points; browser clients cannot insert or edit score rows directly.
+Only **Daily** rounds contribute ranked results. A win awards 100 points on Easy, 150 on Medium, or 200 on Hard. Random rounds remain practice-only. A player can submit one result per game mode, difficulty, and daily puzzle date. The server calculates fixed point values and browser clients cannot insert or edit score rows directly. The win/loss outcome is still reported by the browser, so treat this as a casual community leaderboard rather than a tamper-proof competitive ranking system. Results are queued locally so a player can finish a Daily round as a guest, sign in later, and then publish that result.
 
 Ranks are based on total points: Rookie Listener (0), Bronze Listener (300), Silver Listener (750), Gold Listener (1,500), Platinum Listener (2,500), Diamond Listener (4,000), and Legend (6,000).
 
