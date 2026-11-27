@@ -16,13 +16,9 @@ function validImageData(value, maxLength) {
   if (value == null || value === '') return null;
   const image = String(value).trim();
   if (image.length > maxLength) return null;
-  if (/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(image)) return image;
-  try {
-    const url = new URL(image);
-    return url.protocol === 'https:' && url.hostname ? image : null;
-  } catch {
-    return null;
-  }
+  // Profile images are accepted only as compressed file data from the upload control.
+  // External image links are intentionally not supported.
+  return /^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(image) ? image : null;
 }
 
 async function readProfile(pool, userId) {
