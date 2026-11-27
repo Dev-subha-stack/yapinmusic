@@ -18,7 +18,7 @@ function validImageData(value, maxLength) {
   if (image.length > maxLength) return null;
   // Profile images are accepted only as compressed file data from the upload control.
   // External image links are intentionally not supported.
-  return /^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(image) ? image : null;
+  return /^data:image\/(?:png|apng|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(image) ? image : null;
 }
 
 async function readProfile(pool, userId) {
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     const bio = validBio(body.bio);
     const hasAvatar = Object.prototype.hasOwnProperty.call(body, 'avatarData');
     const hasBanner = Object.prototype.hasOwnProperty.call(body, 'bannerData');
-    const avatarData = hasAvatar ? validImageData(body.avatarData, 950000) : null;
+    const avatarData = hasAvatar ? validImageData(body.avatarData, 1400000) : null;
     const bannerData = hasBanner ? validImageData(body.bannerData, 1850000) : null;
     if (bio == null) return res.status(400).json({ error: 'Your bio must be 160 characters or fewer.' });
     if (hasAvatar && body.avatarData && !avatarData) return res.status(400).json({ error: 'The profile photo could not be processed. Choose a JPG, PNG, WebP or GIF image and try again.' });
