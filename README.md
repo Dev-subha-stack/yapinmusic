@@ -74,7 +74,7 @@ Searches are manual rather than automatic while typing. Successful responses are
 
 The shared leaderboard and authentication are powered by a dedicated Neon project. Players can play every round as guests. An account is optional and is only needed to publish a public player name.
 
-Only Daily rounds count towards ranked points: Easy wins = 100, Medium wins = 150, and Hard wins = 200. Random rounds stay unranked. Each user can submit one result per game mode, difficulty, and daily puzzle date. Scores are assigned on the server and authenticated with Neon Managed Better Auth. Guest Daily results are queued locally and can be uploaded after the player signs in.
+Only Daily rounds count towards ranked points: Easy wins = 100, Medium wins = 150, and Hard wins = 200. Random rounds stay unranked. Each user can submit one result per game mode, difficulty, and daily puzzle date. Points are calculated on the server and requests are authenticated with Neon Managed Better Auth. The current game still reports the win/loss outcome from the browser, so treat this as a casual community leaderboard rather than a tamper-proof competitive ranking system. Guest Daily results are queued locally and can be uploaded after the player signs in.
 
 Ranks are based on total points: Rookie Listener (0), Bronze Listener (300), Silver Listener (750), Gold Listener (1,500), Platinum Listener (2,500), Diamond Listener (4,000), and Legend (6,000).
 
