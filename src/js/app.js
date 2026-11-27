@@ -2186,22 +2186,41 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       catch (error) { publicProfileId = ''; }
     }
     if (VIEWS.indexOf(h) < 0) h = 'home';
-    VIEWS.forEach(function (v) { document.getElementById('v-' + v).hidden = v !== h; });
+    var isPlayerOverlay = h === 'player-profile';
+    VIEWS.forEach(function (v) {
+      var keepBoardBehindOverlay = isPlayerOverlay && v === 'leaderboard';
+      document.getElementById('v-' + v).hidden = v !== h && !keepBoardBehindOverlay;
+    });
+    document.body.classList.toggle('player-profile-open', isPlayerOverlay);
     document.querySelectorAll('[data-nav]').forEach(function (a) {
-      if (a.dataset.nav === h) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      var navRoute = isPlayerOverlay ? 'leaderboard' : h;
+      if (a.dataset.nav === navRoute) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     document.getElementById('band').toggleAttribute('data-home', h === 'home');
     active = games[h] || null;
     if (active) active.init();
-    if ((h === 'leaderboard' || h === 'profile') && leaderboardUI) leaderboardUI.init();
-    if (h === 'player-profile' && publicProfileUI) publicProfileUI.show(publicProfileId);
+    if ((h === 'leaderboard' || h === 'profile' || isPlayerOverlay) && leaderboardUI) leaderboardUI.init();
+    if (isPlayerOverlay && publicProfileUI) publicProfileUI.show(publicProfileId);
     if (h === 'tasks' && tasksUI) tasksUI.init();
     if (queuedRandomGame === h && active && active.random) {
       active.random();
       queuedRandomGame = null;
     }
-    window.scrollTo(0, 0);
+    if (!isPlayerOverlay) window.scrollTo(0, 0);
   }
+
+  var publicProfileOverlay = document.getElementById('v-player-profile');
+  if (publicProfileOverlay) {
+    publicProfileOverlay.addEventListener('click', function (event) {
+      if (event.target === publicProfileOverlay) location.hash = '#leaderboard';
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !publicProfileOverlay.hidden) {
+        location.hash = '#leaderboard';
+      }
+    });
+  }
+
   window.addEventListener('hashchange', route);
   route();
 })();
