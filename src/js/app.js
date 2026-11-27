@@ -1131,21 +1131,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
               '</div>' +
               '<button class="btn primary" type="submit" data-explore-submit>Search</button>' +
             '</form>' +
-            '<section class="music-featured" aria-label="Explore Indian music">' +
-              '<div><h2>Explore Indian music</h2><p class="music-muted">Start with artists and bands from across India, including the Northeast.</p></div>' +
-              '<div class="music-featured-tags">' +
-                '<button type="button" data-featured-query="Arijit Singh">Arijit Singh</button>' +
-                '<button type="button" data-featured-query="A. R. Rahman">A. R. Rahman</button>' +
-                '<button type="button" data-featured-query="Shreya Ghoshal">Shreya Ghoshal</button>' +
-                '<button type="button" data-featured-query="Anuv Jain">Anuv Jain</button>' +
-                '<button type="button" data-featured-query="The Local Train">The Local Train</button>' +
-                '<button type="button" data-featured-query="Indian Ocean">Indian Ocean</button>' +
-                '<button type="button" data-featured-query="Papon">Papon</button>' +
-                '<button type="button" data-featured-query="Zubeen Garg">Zubeen Garg</button>' +
-                '<button type="button" data-featured-query="Bhupen Hazarika">Bhupen Hazarika</button>' +
-                '<button type="button" data-featured-query="When Chai Met Toast">When Chai Met Toast</button>' +
-              '</div>' +
-            '</section>' +
             '<p class="music-muted">Start typing to see matching artists, bands and songs. Online searches run when you press Search. Results are cached on this device for 7 days.</p>' +
             '<p class="explore-status" data-explore-status role="status" aria-live="polite">Search for a band, artist or song to get started.</p>' +
             '<div class="explore-results" data-explore-results></div>' +
@@ -2183,7 +2168,39 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   /* ============ ROUTES ============ */
 
   var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'tasks', 'profile', 'player-profile', 'our-team'];
+  var mobileNavToggle = document.getElementById('mobile-nav-toggle');
+  var mobileNav = document.getElementById('main-navigation');
+
+  function closeMobileNav() {
+    if (!mobileNavToggle || !mobileNav) return;
+    mobileNav.classList.remove('is-open');
+    mobileNavToggle.setAttribute('aria-expanded', 'false');
+    mobileNavToggle.setAttribute('aria-label', 'Open navigation');
+  }
+
+  if (mobileNavToggle && mobileNav) {
+    mobileNavToggle.addEventListener('click', function () {
+      var opening = mobileNavToggle.getAttribute('aria-expanded') !== 'true';
+      mobileNavToggle.setAttribute('aria-expanded', String(opening));
+      mobileNavToggle.setAttribute('aria-label', opening ? 'Close navigation' : 'Open navigation');
+      mobileNav.classList.toggle('is-open', opening);
+    });
+    mobileNav.addEventListener('click', function (event) {
+      if (event.target.closest('a')) closeMobileNav();
+    });
+    document.addEventListener('click', function (event) {
+      if (!event.target.closest('.site-head')) closeMobileNav();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && mobileNav.classList.contains('is-open')) {
+        closeMobileNav();
+        mobileNavToggle.focus();
+      }
+    });
+  }
+
   function route() {
+    closeMobileNav();
     var hashRoute = location.hash.replace(/^#/, '');
     var publicProfileId = '';
     var h = hashRoute;
