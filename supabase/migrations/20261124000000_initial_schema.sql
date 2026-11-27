@@ -76,8 +76,8 @@ with totals as (
     p.username,
     coalesce(sum(s.score), 0)::integer as total_points,
     count(s.id)::integer as games_played,
-    count(s.id) filter (where s.won)::integer as wins,
-    count(s.id) filter (where not s.won)::integer as losses
+    (count(s.id) filter (where s.won))::integer as wins,
+    (count(s.id) filter (where not s.won))::integer as losses
   from public.profiles p
   left join public.game_scores s on s.user_id = p.id
   group by p.id, p.username
