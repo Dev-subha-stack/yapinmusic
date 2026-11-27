@@ -182,6 +182,16 @@ export async function getLeaderboard(options = {}) {
   return { configured: true, entries: data || [] };
 }
 
+export async function getPlayerLeaderboardEntry() {
+  if (!supabase || !currentSession) return null;
+  const { data, error } = await supabase.from('player_leaderboard')
+    .select('user_id, username, total_points, wins, games_played, rank_position')
+    .eq('user_id', currentSession.user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 export async function submitScore(score) {
   if (adapter) return adapter.submitScore(score);
   if (!supabase) return { saved: false, reason: 'backend-not-configured' };
