@@ -929,7 +929,11 @@ select {
   }
   .site-head .brand {
     min-width: max-content;
-    font-size: clamp(1.12rem, 1.45vw, 1.4rem);
+    font-size: clamp(1.35rem, 1.8vw, 1.65rem);
+  }
+  .site-head .brand img {
+    width: 62px;
+    height: 62px;
   }
   .site-head nav {
     min-width: 0;
@@ -943,7 +947,7 @@ select {
     flex: 0 1 auto;
     padding: 9px clamp(8px, .85vw, 15px);
     white-space: nowrap;
-    font-size: clamp(.82rem, .92vw, .98rem);
+    font-size: clamp(.92rem, .98vw, 1.05rem);
   }
   .site-head .theme-toggle {
     grid-column: 3;
