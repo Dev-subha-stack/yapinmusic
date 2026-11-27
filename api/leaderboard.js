@@ -11,7 +11,11 @@ export default async function handler(req, res) {
     const parsed = Number.parseInt(String(req.query && req.query.limit || '100'), 10);
     const limit = Number.isFinite(parsed) ? Math.max(1, Math.min(100, parsed)) : 100;
     const { rows } = await getPool().query(
-      'select user_id, username, total_points, wins, games_played, rank_position from public.player_leaderboard order by rank_position asc limit $1',
+      `select l.user_id, l.username, p.avatar_url, l.total_points, l.wins, l.games_played, l.rank_position
+         from public.player_leaderboard l
+         join public.player_profiles p on p.user_id = l.user_id
+        order by l.rank_position asc
+        limit $1`,
       [limit]
     );
     return res.status(200).json({ entries: rows });
