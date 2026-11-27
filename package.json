@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Yapin Music \u2014 daily and random music guessing games.",
+  "description": "Yapin Music — daily and random music guessing games.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -13,5 +13,8 @@
   },
   "devDependencies": {
     "vite": "^6.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.2"
   }
 }
