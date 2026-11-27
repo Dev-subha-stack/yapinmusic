@@ -1281,3 +1281,97 @@ body.player-profile-open { overflow:hidden; }
 @media (prefers-reduced-motion:reduce) {
   .player-profile-overlay:not([hidden]), .public-profile-modal { animation:none; }
 }
+
+
+/* ===== Compact public player profile overlay refinement ===== */
+.player-profile-overlay[hidden] { display:none !important; }
+.player-profile-overlay:not([hidden]) {
+  position:fixed; inset:0; z-index:1200;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; padding:20px;
+  background:rgba(12,9,11,.72);
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+}
+.public-profile-modal {
+  box-sizing:border-box; width:min(92vw,620px); max-width:620px;
+  max-height:min(86vh,680px); min-width:0;
+  display:grid; align-content:start; gap:12px;
+  overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+  scrollbar-width:none; -ms-overflow-style:none;
+  padding:18px; border:1px solid var(--line); border-radius:20px;
+  background:var(--bg); box-shadow:0 24px 80px rgba(0,0,0,.4);
+}
+.public-profile-modal::-webkit-scrollbar { display:none; width:0; height:0; }
+.public-profile-modal .profile-page-head {
+  align-items:flex-start; min-width:0; padding:0 48px 0 0; margin:0;
+}
+.public-profile-modal .profile-page-head h1 {
+  margin:0; font-size:clamp(1.45rem,3.5vw,1.9rem); line-height:1.18;
+}
+.public-profile-modal .profile-page-head .lede { margin:5px 0 0; font-size:.86rem; line-height:1.4; }
+.public-profile-close {
+  position:sticky; top:0; z-index:20; justify-self:end; align-self:start;
+  display:grid; place-items:center; flex:none;
+  width:38px; height:38px; min-width:38px; margin:0 0 -50px auto;
+  border:1px solid var(--line); border-radius:50%;
+  background:var(--surface); color:var(--fg); text-decoration:none;
+  font:600 1.55rem/1 Arial,sans-serif; box-shadow:0 4px 18px rgba(0,0,0,.15);
+  transition:background .15s,border-color .15s,transform .15s;
+}
+.public-profile-close:hover { border-color:var(--accent); background:var(--hover); transform:rotate(90deg); }
+.public-profile-close:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.public-profile-panel { padding:0; overflow:hidden; border-radius:16px; }
+.public-player-card { border:0; border-radius:16px; }
+.public-player-banner { height:clamp(115px,18vh,160px); }
+.public-player-content { padding:0 16px 16px; }
+.public-player-identity {
+  display:flex; align-items:center; gap:14px; min-width:0;
+  min-height:78px; margin-top:-36px; position:relative; z-index:2;
+}
+.public-player-avatar {
+  width:78px; height:78px; border-width:4px; border-radius:20px;
+  font-size:1.45rem;
+}
+.public-player-avatar img { border-radius:15px; }
+.public-player-name-block {
+  display:grid; flex:1 1 0; min-width:0; gap:5px;
+  align-self:center; padding:0 0 0 0;
+}
+.public-player-name-block h2 {
+  display:block; max-width:100%; min-width:0; margin:0;
+  font-size:clamp(1.2rem,3vw,1.55rem); line-height:1.2;
+  white-space:normal; overflow-wrap:anywhere; word-break:break-word;
+}
+.public-player-rank { margin:0; font-size:.8rem; line-height:1.35; overflow-wrap:anywhere; }
+.public-player-bio { margin:12px 0 0; font-size:.9rem; line-height:1.5; }
+.public-player-stats { gap:9px; margin-top:15px; }
+.public-player-stat { gap:5px; padding:12px 13px; border-radius:12px; }
+.public-player-stat span { font-size:.67rem; }
+.public-player-stat strong { font-size:clamp(1.15rem,2.5vw,1.5rem); line-height:1.15; }
+@media (max-width:600px) {
+  .player-profile-overlay:not([hidden]) {
+    align-items:stretch; justify-content:center; overflow:hidden; padding:0;
+    background:var(--bg); backdrop-filter:none; -webkit-backdrop-filter:none;
+  }
+  .public-profile-modal {
+    width:100%; max-width:none; max-height:none; height:100%;
+    padding:max(12px,env(safe-area-inset-top)) 13px max(15px,env(safe-area-inset-bottom));
+    border:0; border-radius:0; box-shadow:none; gap:10px;
+  }
+  .public-profile-modal .profile-page-head { padding-right:48px; }
+  .public-profile-modal .profile-page-head .lede { font-size:.82rem; }
+  .public-profile-close { width:36px; height:36px; min-width:36px; margin-bottom:-46px; }
+  .public-player-banner { height:clamp(110px,17vh,145px); }
+  .public-player-content { padding:0 12px 14px; }
+  .public-player-identity { gap:11px; min-height:70px; margin-top:-32px; }
+  .public-player-avatar { width:70px; height:70px; border-radius:18px; }
+  .public-player-avatar img { border-radius:13px; }
+  .public-player-name-block h2 { font-size:clamp(1.05rem,5vw,1.4rem); }
+  .public-player-rank { font-size:.72rem; }
+}
+@media (max-width:420px) {
+  .public-player-stats { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  .public-player-stat { display:grid; padding:9px 7px; }
+  .public-player-stat span { font-size:.58rem; letter-spacing:.02em; }
+  .public-player-stat strong { font-size:1.05rem; }
+}
