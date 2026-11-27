@@ -19,7 +19,7 @@
 <div class="band" id="band" data-home="" role="presentation"><div class="band-title" aria-hidden="true"><span style="--i:0">Y</span><span style="--i:1">a</span><span style="--i:2">p</span><span style="--i:3">i</span><span style="--i:4">n</span><span class="sp"></span><span style="--i:6">M</span><span style="--i:7">u</span><span style="--i:8">s</span><span style="--i:9">i</span><span style="--i:10">c</span></div></div>
 <header class="site-head"><div class="wrap top">
   <a class="brand" href="#home"><img src="/assets/brand-icon.webp" alt="" width="40" height="40"><span>Yapin Music</span></a>
-  <nav aria-label="Main">
+  <nav id="main-navigation" aria-label="Main">
     <a href="#home" data-nav="home">Home</a>
     <a href="#song" data-nav="song">Guess the Song</a>
     <a href="#band" data-nav="band">Guess the Band</a>
@@ -37,6 +37,10 @@
       <span class="profile-trigger-avatar" data-profile-trigger-avatar aria-hidden="true">Y</span>
       <span class="profile-trigger-label">Profile</span>
     </a>
+    <button class="mobile-nav-toggle" id="mobile-nav-toggle" type="button"
+      aria-label="Open navigation" aria-controls="main-navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 </div></header>
 
