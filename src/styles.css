@@ -920,6 +920,7 @@ select {
 @media (min-width: 701px) {
   .site-head .wrap.top {
     width: min(100%, 1600px);
+    max-width: 1600px;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
