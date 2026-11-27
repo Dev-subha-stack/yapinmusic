@@ -1,9 +1,9 @@
 export const DAILY_FREE_POINTS = 25;
 
 export const DAILY_MISSIONS = Object.freeze([
-  { id: 'play_daily', title: 'Warm up', description: 'Finish one Daily round in Guess the Song or Guess the Band.', reward: 15, metric: 'gamesPlayed', target: 1 },
-  { id: 'win_daily', title: 'Spotlight win', description: 'Win at least one Daily music challenge.', reward: 30, metric: 'wins', target: 1 },
-  { id: 'double_feature', title: 'Double feature', description: 'Finish both Daily games: Guess the Song and Guess the Band.', reward: 40, metric: 'gameModes', target: 2 },
+  { id: 'play_daily', title: 'Warm up', description: 'Finish one round in Guess the Song or Guess the Band (Daily or Random).', reward: 15, metric: 'gamesPlayed', target: 1 },
+  { id: 'win_daily', title: 'Spotlight win', description: 'Win at least one Daily or Random music challenge.', reward: 30, metric: 'wins', target: 1 },
+  { id: 'double_feature', title: 'Double feature', description: 'Finish both games: Guess the Song and Guess the Band (Daily or Random).', reward: 40, metric: 'gameModes', target: 2 },
 ]);
 
 export function getDailyMissionStatus(metrics = {}, claimedMissionIds = []) {
