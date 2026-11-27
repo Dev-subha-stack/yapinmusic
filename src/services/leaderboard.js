@@ -296,7 +296,9 @@ export async function submitScore(score) {
         difficulty: score.difficulty,
         won: Boolean(score.won),
         guessesUsed: Number(score.guessesUsed) || 0,
-        puzzleDate: score.puzzleDate
+        puzzleDate: score.puzzleDate,
+        roundType: score.roundType === 'random' ? 'random' : 'daily',
+        roundId: score.roundType === 'random' ? score.roundId : null
       })
     });
   } catch (error) {
