@@ -227,21 +227,34 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     return ls.get(pendingLeaderboardKey) || [];
   }
 
-  function rememberPendingLeaderboardScore(score) {
-    var pending = pendingLeaderboardScores().filter(function (item) {
-      return !(item.gameMode === score.gameMode && item.difficulty === score.difficulty && item.puzzleDate === score.puzzleDate);
-    });
-    pending.push(score);
-    ls.set(pendingLeaderboardKey, pending);
+  function createRoundId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return 'round-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) + '-' + Math.random().toString(36).slice(2);
   }
 
-  function submitDailyLeaderboardScore(gameMode, difficulty, won, guessesUsed) {
+  function leaderboardScoreKey(score) {
+    if (score.roundType === 'random') return 'random:' + String(score.roundId || '');
+    return 'daily:' + [score.gameMode, score.difficulty, score.puzzleDate].join(':');
+  }
+
+  function rememberPendingLeaderboardScore(score) {
+    var pending = pendingLeaderboardScores().filter(function (item) {
+      return leaderboardScoreKey(item) !== leaderboardScoreKey(score);
+    });
+    pending.push(score);
+    ls.set(pendingLeaderboardKey, pending.slice(-50));
+  }
+
+  function submitLeaderboardScore(gameMode, difficulty, won, guessesUsed, roundType, roundId) {
+    var type = roundType === 'random' ? 'random' : 'daily';
     var score = {
       gameMode: gameMode,
       difficulty: difficulty,
       won: Boolean(won),
       guessesUsed: guessesUsed,
-      puzzleDate: localPuzzleDate()
+      puzzleDate: localPuzzleDate(),
+      roundType: type,
+      roundId: type === 'random' ? String(roundId || createRoundId()) : null
     };
     rememberPendingLeaderboardScore(score);
     flushPendingLeaderboardScores();
@@ -256,7 +269,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     Promise.all(pending.map(function (score) {
       return submitScore(score).then(function (result) {
         if (result && result.saved) {
-          if (!result.duplicate && score.won) toast('Daily score added · +' + result.points + ' points');
+          if (!result.duplicate && score.won) {
+            var label = score.roundType === 'random' ? 'Random' : 'Daily';
+            toast(label + ' score added · +' + result.points + ' points');
+          }
           return score;
         }
         return null;
@@ -267,10 +283,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     })).then(function (completed) {
       var submitted = completed.filter(Boolean);
       if (!submitted.length) return;
+      var submittedKeys = new Set(submitted.map(leaderboardScoreKey));
       var remaining = pendingLeaderboardScores().filter(function (score) {
-        return !submitted.some(function (done) {
-          return done.gameMode === score.gameMode && done.difficulty === score.difficulty && done.puzzleDate === score.puzzleDate;
-        });
+        return !submittedKeys.has(leaderboardScoreKey(score));
       });
       ls.set(pendingLeaderboardKey, remaining);
       if (leaderboardUI) leaderboardUI.refresh();
@@ -279,11 +294,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     });
   }
 
-  function addDailyLeaderboardPrompt(resultEl, won) {
+  function addDailyLeaderboardPrompt(resultEl, won, roundType) {
     var account = getAccountState();
     var note = el('div', 'lb-game-note');
+    var label = roundType === 'random' ? 'Random' : 'Daily';
     var message = account.user && account.profile
-      ? (won ? 'Daily win points are being added to your player card.' : 'This Daily attempt is recorded. A win is worth 100–200 points.')
+      ? (won ? label + ' win points are being added to your player card.' : 'This ' + label + ' attempt is recorded. A win is worth 100–200 points.')
       : 'Play as a guest, or sign in if you want your name and rank to appear on the shared leaderboard.';
     note.appendChild(el('p', null, message));
     if (!account.user || !account.profile) {
@@ -325,7 +341,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   function gameSong() {
     var root = document.getElementById('v-song');
     var HINT_CAP = 9, orders = {};
-    var S = { mode: 'daily', diff: getDiff('song'), bi: 0, guesses: [], done: false, won: false, counted: false, hints: 0 };
+    var S = { mode: 'daily', diff: getDiff('song'), bi: 0, guesses: [], done: false, won: false, counted: false, hints: 0, roundId: null };
     var NOTES = {
       easy: '8 lives · the most famous bands · free hint button',
       medium: '6 lives · well-known bands · hint button costs 1 life',
@@ -450,6 +466,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
     function start(mode) {
       S.mode = mode;
+      S.roundId = mode === 'random' ? createRoundId() : null;
       var bp = bandPool(S.diff);
       if (mode === 'daily') { var ord = orderFor(S.diff); S.bi = bp[ord[(day - 1) % ord.length]]; }
       else { var n; do { n = bp[Math.floor(Math.random() * bp.length)]; } while (n === S.bi && bp.length > 1); S.bi = n; }
@@ -582,7 +599,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         S.counted = true;
         save();
         statsRender(statsEl, sKey());
-        submitDailyLeaderboardScore('song', S.diff, S.won, S.guesses.length);
+        submitLeaderboardScore('song', S.diff, S.won, S.guesses.length, 'daily');
+      } else if (S.mode === 'random') {
+        submitLeaderboardScore('song', S.diff, S.won, S.guesses.length, 'random', S.roundId);
       }
       showResult();
     }
@@ -602,7 +621,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       resultEl.appendChild(ul);
       if (S.mode === 'daily') {
         resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
-        addDailyLeaderboardPrompt(resultEl, S.won);
+        addDailyLeaderboardPrompt(resultEl, S.won, S.mode);
       }
       var acts = el('div', 'acts');
       var copy = el('button', 'btn primary', 'Copy result'); copy.type = 'button';
@@ -631,7 +650,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   function gameBand() {
     var root = document.getElementById('v-band');
     var HINT_CAP = 8, orders = {};
-    var S = { mode: 'daily', diff: getDiff('band'), song: null, guesses: [], done: false, won: false, counted: false, hints: 0 };
+    var S = { mode: 'daily', diff: getDiff('band'), song: null, guesses: [], done: false, won: false, counted: false, hints: 0, roundId: null };
     var NOTES = {
       easy: '9 guesses · the most famous songs · free hint button',
       medium: '7 guesses · well-known songs · hint button costs 1 guess',
@@ -826,6 +845,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
     function start(mode) {
       S.mode = mode;
+      S.roundId = mode === 'random' ? createRoundId() : null;
       var sp = songPool(S.diff);
       if (mode === 'daily') { var ord = orderFor(S.diff); S.song = sp[ord[(day - 1) % ord.length]]; }
       else { var s; do { s = sp[Math.floor(Math.random() * sp.length)]; } while (s === S.song && sp.length > 1); S.song = s; }
@@ -925,7 +945,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           S.counted = true;
           save();
           statsRender(statsEl, sKey());
-          submitDailyLeaderboardScore('band', S.diff, S.won, S.guesses.length);
+          submitLeaderboardScore('band', S.diff, S.won, S.guesses.length, 'daily');
+        } else if (S.mode === 'random') {
+          submitLeaderboardScore('band', S.diff, S.won, S.guesses.length, 'random', S.roundId);
         }
         showResult();
       }
@@ -947,7 +969,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       resultEl.appendChild(el('p', 'sub', a.g + ' · ' + a.c + ' · formed ' + a.y));
       if (S.mode === 'daily') {
         resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
-        addDailyLeaderboardPrompt(resultEl, S.won);
+        addDailyLeaderboardPrompt(resultEl, S.won, S.mode);
       }
       var acts = el('div', 'acts');
       var copy = el('button', 'btn primary', 'Copy result'); copy.type = 'button';
