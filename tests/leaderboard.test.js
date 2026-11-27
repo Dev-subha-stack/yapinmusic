@@ -8,7 +8,7 @@ import {
   rankFor
 } from '../src/services/leaderboard.js';
 
-test('reports an inactive backend without breaking local play', async () => {
+test('reports an unconfigured backend without breaking local play', async () => {
   assert.equal(isLeaderboardConfigured(), false);
   assert.deepEqual(await getLeaderboard(), { configured: false, entries: [] });
   assert.deepEqual(await submitScore({ score: 10 }), { saved: false, reason: 'backend-not-configured' });
