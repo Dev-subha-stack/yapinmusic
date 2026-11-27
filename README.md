@@ -70,21 +70,24 @@ The Music Explorer connects to two public catalog services when a visitor submit
 
 Searches are manual rather than automatic while typing. Successful responses are cached in the visitor's browser for seven days. These lookups do not change game answers, daily selection, scores, or the local catalog. The feature degrades gracefully if a provider is unavailable. Apple documents an approximate limit of 20 Search API calls per minute, so avoid automated bulk lookups and keep the cache enabled.
 
-## Current data and backend status
+## Accounts, leaderboard, and ranks
 
-The current game is still **frontend-only**. Theme preference, difficulty preferences, daily-round state, and personal stats remain in the visitor's browser using `localStorage`. There is no account system, live database connection, or shared leaderboard enabled in this starter repository.
+Gameplay remains open to guests. An account is optional and is only needed when a player wants a public name on the shared leaderboard. Email/password sign-up and sign-in are handled by Supabase Auth; the public profile contains only the chosen username.
 
-A first Supabase schema draft is included at `supabase/migrations/20261124000000_initial_schema.sql`. It lays out profiles, per-game scores, row-level security policies, indexes, and a leaderboard view. It is a starting point, not a production-ready anti-cheat system. Before enabling public rankings, score submission should be validated by a trusted server-side function or RPC; never trust a score sent directly by a browser client.
+Only **Daily** rounds contribute ranked results. A win awards 100 points on Easy, 150 on Medium, or 200 on Hard. Random rounds remain practice-only. A player can submit one result per game mode, difficulty, and daily puzzle date. The server assigns the points; browser clients cannot insert or edit score rows directly.
 
-When the database is added:
+Ranks are based on total points: Rookie Listener (0), Bronze Listener (300), Silver Listener (750), Gold Listener (1,500), Platinum Listener (2,500), Diamond Listener (4,000), and Legend (6,000).
 
-1. Create a Supabase project and review/apply the migration.
-2. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to local and hosting environment settings.
-3. Add sign-up/sign-in and profile management.
-4. Implement a Supabase-backed leaderboard adapter in `src/services/leaderboard.js`.
-5. Validate score calculations server-side, then connect the game result screens to score submission and leaderboard reads.
+### Connect the backend
 
-Only the Supabase anon/publishable key belongs in browser configuration. Never expose a service-role key in frontend code or `.env` values prefixed with `VITE_`.
+The repository includes the migration at `supabase/migrations/20261124000000_initial_schema.sql` and the authenticated score function at `supabase/functions/submit-score/index.ts`. They must be applied/deployed to a **dedicated YapinMusic Supabase project**; do not reuse a project belonging to another app.
+
+1. Create a Supabase project, then run the SQL migration in its SQL Editor (or apply it with the Supabase CLI).
+2. Deploy the Edge Function: `supabase functions deploy submit-score`. Keep JWT verification enabled.
+3. In Vercel project settings, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` using the project's URL and public anon/publishable key. The service-role key must never be exposed to the browser.
+4. Redeploy the Vercel site after setting the environment variables.
+
+Without those backend steps, the site continues to work as a guest game and shows that the shared leaderboard is not connected yet.
 
 ## Development notes
 
