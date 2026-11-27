@@ -1477,14 +1477,15 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       coverPlaceholder.hidden = Boolean(profile.banner_url);
       cover.appendChild(coverImage);
       cover.appendChild(coverPlaceholder);
-      var bannerPicker = el('input');
+      var bannerPicker = el('input', 'profile-file-input');
       bannerPicker.type = 'file';
-      bannerPicker.accept = 'image/png,image/jpeg,image/webp';
-      bannerPicker.hidden = true;
-      var bannerEditButton = el('button', 'profile-image-edit profile-banner-edit', 'Change banner');
-      bannerEditButton.type = 'button';
+      bannerPicker.accept = 'image/*';
+      bannerPicker.setAttribute('aria-label', 'Choose a profile banner from your computer');
+      var bannerEditButton = el('label', 'profile-image-edit profile-banner-edit', 'Change banner');
+      bannerEditButton.setAttribute('role', 'button');
+      bannerEditButton.tabIndex = 0;
+      bannerEditButton.appendChild(bannerPicker);
       cover.appendChild(bannerEditButton);
-      cover.appendChild(bannerPicker);
       preview.appendChild(cover);
 
       var identity = el('div', 'profile-preview-identity');
@@ -1497,15 +1498,15 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       avatarFallback.hidden = Boolean(profile.avatar_url);
       avatarWrap.appendChild(avatarImage);
       avatarWrap.appendChild(avatarFallback);
-      var avatarPicker = el('input');
+      var avatarPicker = el('input', 'profile-file-input');
       avatarPicker.type = 'file';
-      avatarPicker.accept = 'image/png,image/jpeg,image/webp';
-      avatarPicker.hidden = true;
-      var avatarEditButton = el('button', 'profile-image-edit profile-avatar-edit', 'Edit');
-      avatarEditButton.type = 'button';
-      avatarEditButton.setAttribute('aria-label', 'Change profile picture');
+      avatarPicker.accept = 'image/*';
+      avatarPicker.setAttribute('aria-label', 'Choose a profile picture from your computer');
+      var avatarEditButton = el('label', 'profile-image-edit profile-avatar-edit', 'Edit');
+      avatarEditButton.setAttribute('role', 'button');
+      avatarEditButton.tabIndex = 0;
+      avatarEditButton.appendChild(avatarPicker);
       avatarWrap.appendChild(avatarEditButton);
-      avatarWrap.appendChild(avatarPicker);
       identity.appendChild(avatarWrap);
       var previewText = el('div', 'profile-preview-text');
       previewText.appendChild(el('strong', 'profile-preview-name', profile.username || accountState.user.name || 'Your player name'));
@@ -1543,8 +1544,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var compressionBox = el('div', 'profile-compression-status');
       compressionBox.hidden = true;
       editor.appendChild(compressionBox);
-      var pendingAvatarData = null;
-      var pendingBannerData = null;
+      var selectedAvatarFile = null;
+      var selectedBannerFile = null;
       var avatarPreviewSource = profile.avatar_url || '';
       var bannerPreviewSource = profile.banner_url || '';
       var avatarObjectUrl = null;
@@ -1617,11 +1618,11 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         updateLiveHeaderAvatar(avatarUrl);
       }
 
-      async function processProfileImage(file, kind) {
+      function selectProfileImage(file, kind) {
         if (!file) return;
-        if (!/^image\/(png|jpeg|webp)$/i.test(file.type)) {
-          setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose a PNG, JPG or WebP image.' });
-          toast('Choose a PNG, JPG or WebP image.');
+        if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+          setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose a regular photo such as JPG, PNG, WebP, AVIF or GIF.' });
+          toast('Please choose a photo image (JPG, PNG, WebP, AVIF or GIF).');
           return;
         }
         if (file.size > 20 * 1024 * 1024) {
@@ -1631,112 +1632,80 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         }
 
         var isAvatar = kind === 'avatar';
-        var maxStoredBytes = isAvatar ? 450 * 1024 : 1.2 * 1024 * 1024;
-        var maxDataLength = isAvatar ? 900000 : 1800000;
-        var currentPreviewUrl = URL.createObjectURL(file);
+        var objectUrl = URL.createObjectURL(file);
         revokeObjectUrl(kind);
         if (isAvatar) {
-          avatarObjectUrl = currentPreviewUrl;
-          avatarPreviewSource = currentPreviewUrl;
+          selectedAvatarFile = file;
+          avatarObjectUrl = objectUrl;
+          avatarPreviewSource = objectUrl;
           avatarUrlField.input.value = '';
-          pendingAvatarData = null;
         } else {
-          bannerObjectUrl = currentPreviewUrl;
-          bannerPreviewSource = currentPreviewUrl;
+          selectedBannerFile = file;
+          bannerObjectUrl = objectUrl;
+          bannerPreviewSource = objectUrl;
           bannerUrlField.input.value = '';
-          pendingBannerData = null;
         }
         updatePreview();
-        compressingImage = true;
-        avatarEditButton.disabled = true;
-        bannerEditButton.disabled = true;
+
+        // Show the selected local image immediately. Compression happens only on Save,
+        // following Chatter's profile-upload flow, so previewing never depends on the encoder.
         setCompressionStatus({
-          phase: 'compressing',
-          progress: 1,
+          phase: 'done',
+          progress: 100,
           originalSize: file.size,
           outputSize: file.size,
-          message: (isAvatar ? 'Profile photo' : 'Profile banner') + ' · Preparing image…'
+          message: (isAvatar ? 'Profile photo' : 'Profile banner') + ' selected. Preview is live; it will be compressed when you save.'
         });
-
-        try {
-          var result = await compressMediaFile(file, {
-            maxDimension: isAvatar ? 512 : 1800,
-            cropSquare: isAvatar,
-            quality: isAvatar ? 0.86 : 0.82,
-            targetBytes: maxStoredBytes,
-            onProgress: function (state) {
-              setCompressionStatus({
-                ...state,
-                message: (isAvatar ? 'Profile photo · ' : 'Profile banner · ') + (state.message || '')
-              });
-            }
-          });
-          var chosen = result.file;
-          if (!/^image\/(webp|png|jpeg)$/i.test(chosen.type)) {
-            throw new Error('This image format cannot be stored. Choose PNG, JPG or WebP.');
-          }
-          if (chosen.size > maxStoredBytes) {
-            throw new Error('After compression this image is still ' + formatMediaBytes(chosen.size) + '. Try a smaller image.');
-          }
-          var dataUrl = await fileToDataUrl(chosen);
-          if (dataUrl.length > maxDataLength) {
-            throw new Error('The compressed image is still too large. Try a smaller image.');
-          }
-          var compressedPreview = URL.createObjectURL(chosen);
-          revokeObjectUrl(kind);
-          if (isAvatar) {
-            avatarObjectUrl = compressedPreview;
-            avatarPreviewSource = compressedPreview;
-            pendingAvatarData = dataUrl;
-          } else {
-            bannerObjectUrl = compressedPreview;
-            bannerPreviewSource = compressedPreview;
-            pendingBannerData = dataUrl;
-          }
-          updatePreview();
-          setCompressionStatus({
-            phase: 'done',
-            progress: 100,
-            originalSize: file.size,
-            outputSize: chosen.size,
-            savedBytes: Math.max(0, file.size - chosen.size),
-            message: (isAvatar ? 'Profile photo' : 'Profile banner') + ' is compressed and ready to save.'
-          });
-          toast((isAvatar ? 'Profile picture' : 'Banner') + ' ready to save.');
-        } catch (error) {
-          revokeObjectUrl(kind);
-          if (isAvatar) {
-            pendingAvatarData = null;
-            avatarPreviewSource = '';
-            avatarUrlField.input.value = profile.avatar_url || '';
-            avatarPicker.value = '';
-          } else {
-            pendingBannerData = null;
-            bannerPreviewSource = '';
-            bannerUrlField.input.value = profile.banner_url || '';
-            bannerPicker.value = '';
-          }
-          updatePreview();
-          setCompressionStatus({ phase: 'error', progress: 100, message: error.message || 'Could not process that image.' });
-          toast(error.message || 'Could not process that image.');
-        } finally {
-          compressingImage = false;
-          avatarEditButton.disabled = false;
-          bannerEditButton.disabled = false;
-        }
       }
 
-      avatarEditButton.addEventListener('click', function () { avatarPicker.click(); });
-      bannerEditButton.addEventListener('click', function () { bannerPicker.click(); });
+      async function compressSelectedImage(file, kind) {
+        if (!file) return null;
+        var isAvatar = kind === 'avatar';
+        var maxStoredBytes = isAvatar ? 450 * 1024 : 1.2 * 1024 * 1024;
+        var maxDataLength = isAvatar ? 900000 : 1800000;
+        var result = await compressMediaFile(file, {
+          maxDimension: isAvatar ? 512 : 1800,
+          cropSquare: isAvatar,
+          quality: isAvatar ? 0.86 : 0.82,
+          targetBytes: maxStoredBytes,
+          onProgress: function (state) {
+            setCompressionStatus({
+              ...state,
+              message: (isAvatar ? 'Profile photo · ' : 'Profile banner · ') + (state.message || '')
+            });
+          }
+        });
+        var chosen = result.file;
+        if (!/^image\/(webp|png|jpe?g|gif)$/i.test(chosen.type)) {
+          throw new Error('This image format could not be prepared. Try a JPG or PNG image.');
+        }
+        if (chosen.size > maxStoredBytes) {
+          throw new Error('After compression this image is still ' + formatMediaBytes(chosen.size) + '. Try a smaller image.');
+        }
+        var dataUrl = await fileToDataUrl(chosen);
+        if (dataUrl.length > maxDataLength) {
+          throw new Error('The compressed image is still too large. Try a smaller image.');
+        }
+        return dataUrl;
+      }
+
       avatarPicker.addEventListener('change', function () {
-        var selected = avatarPicker.files && avatarPicker.files[0];
-        processProfileImage(selected, 'avatar');
-        avatarPicker.value = '';
+        selectProfileImage(avatarPicker.files && avatarPicker.files[0], 'avatar');
       });
       bannerPicker.addEventListener('change', function () {
-        var selected = bannerPicker.files && bannerPicker.files[0];
-        processProfileImage(selected, 'banner');
-        bannerPicker.value = '';
+        selectProfileImage(bannerPicker.files && bannerPicker.files[0], 'banner');
+      });
+      avatarEditButton.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          avatarPicker.click();
+        }
+      });
+      bannerEditButton.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          bannerPicker.click();
+        }
       });
 
       usernameField.input.addEventListener('input', updatePreview);
@@ -1745,23 +1714,18 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         updatePreview();
       });
       avatarUrlField.input.addEventListener('input', function () {
-        pendingAvatarData = null;
+        selectedAvatarFile = null;
         revokeObjectUrl('avatar');
         avatarPreviewSource = avatarUrlField.input.value.trim();
         updatePreview();
       });
       bannerUrlField.input.addEventListener('input', function () {
-        pendingBannerData = null;
+        selectedBannerFile = null;
         revokeObjectUrl('banner');
         bannerPreviewSource = bannerUrlField.input.value.trim();
         updatePreview();
       });
       updatePreview();
-
-      editor.addEventListener('reset', function () {
-        revokeObjectUrl('avatar');
-        revokeObjectUrl('banner');
-      });
 
       var saveMessage = el('p', 'lb-message');
       editor.appendChild(saveMessage);
@@ -1772,26 +1736,37 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       editor.appendChild(actions);
       editor.addEventListener('submit', async function (event) {
         event.preventDefault();
-        if (compressingImage) {
-          setMessage(saveMessage, 'Wait for image compression to finish before saving.', true);
-          return;
-        }
+        if (compressingImage) return;
         saveButton.disabled = true;
-        setMessage(saveMessage, 'Saving your player card…', false);
+        compressingImage = true;
         try {
+          var avatarData = avatarUrlField.input.value.trim() || null;
+          var bannerData = bannerUrlField.input.value.trim() || null;
+          if (selectedAvatarFile || selectedBannerFile) {
+            setMessage(saveMessage, 'Compressing your images before upload…', false);
+            if (selectedAvatarFile) avatarData = await compressSelectedImage(selectedAvatarFile, 'avatar');
+            if (selectedBannerFile) bannerData = await compressSelectedImage(selectedBannerFile, 'banner');
+          }
+          setMessage(saveMessage, 'Saving your player card…', false);
           await saveProfileDetails({
             username: usernameField.input.value,
             bio: bioInput.value,
-            avatarUrl: pendingAvatarData || avatarUrlField.input.value.trim() || null,
-            bannerUrl: pendingBannerData || bannerUrlField.input.value.trim() || null
+            avatarUrl: avatarData,
+            bannerUrl: bannerData
           });
           setMessage(saveMessage, 'Your player card has been updated.', false);
           toast('Profile saved!');
+          revokeObjectUrl('avatar');
+          revokeObjectUrl('banner');
+          selectedAvatarFile = null;
+          selectedBannerFile = null;
           renderProfile(getAccountState());
           refresh();
         } catch (error) {
           setMessage(saveMessage, error.message || 'Could not save your profile.', true);
+          setCompressionStatus({ phase: 'error', progress: 100, message: error.message || 'Could not save your profile.' });
         } finally {
+          compressingImage = false;
           saveButton.disabled = false;
         }
       });
