@@ -1479,7 +1479,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       cover.appendChild(coverPlaceholder);
       var bannerPicker = el('input', 'profile-file-input');
       bannerPicker.type = 'file';
-      bannerPicker.accept = 'image/png,image/jpeg,image/webp,image/gif';
+      bannerPicker.accept = '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif';
       bannerPicker.setAttribute('aria-label', 'Choose a profile banner from your computer');
       var bannerEditButton = el('label', 'profile-image-edit profile-banner-edit', 'Change banner');
       bannerEditButton.appendChild(bannerPicker);
@@ -1498,7 +1498,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       avatarWrap.appendChild(avatarFallback);
       var avatarPicker = el('input', 'profile-file-input');
       avatarPicker.type = 'file';
-      avatarPicker.accept = 'image/png,image/jpeg,image/webp,image/gif';
+      avatarPicker.accept = '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif';
       avatarPicker.setAttribute('aria-label', 'Choose a profile picture from your computer');
       var avatarEditButton = el('label', 'profile-image-edit profile-avatar-edit', 'Edit');
       avatarEditButton.appendChild(avatarPicker);
@@ -1611,7 +1611,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
       function selectProfileImage(file, kind) {
         if (!file) return;
-        if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type)) {
+        if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type) && !/\.(png|jpe?g|webp|gif)$/i.test(file.name || '')) {
           setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose a JPG, PNG, WebP or GIF image.' });
           toast('Please choose a JPG, PNG, WebP or GIF image.');
           return;
