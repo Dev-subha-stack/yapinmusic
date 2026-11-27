@@ -1482,8 +1482,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       bannerPicker.accept = 'image/*';
       bannerPicker.setAttribute('aria-label', 'Choose a profile banner from your computer');
       var bannerEditButton = el('label', 'profile-image-edit profile-banner-edit', 'Change banner');
-      bannerEditButton.setAttribute('role', 'button');
-      bannerEditButton.tabIndex = 0;
       bannerEditButton.appendChild(bannerPicker);
       cover.appendChild(bannerEditButton);
       preview.appendChild(cover);
@@ -1503,8 +1501,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       avatarPicker.accept = 'image/*';
       avatarPicker.setAttribute('aria-label', 'Choose a profile picture from your computer');
       var avatarEditButton = el('label', 'profile-image-edit profile-avatar-edit', 'Edit');
-      avatarEditButton.setAttribute('role', 'button');
-      avatarEditButton.tabIndex = 0;
       avatarEditButton.appendChild(avatarPicker);
       avatarWrap.appendChild(avatarEditButton);
       identity.appendChild(avatarWrap);
@@ -1695,19 +1691,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       bannerPicker.addEventListener('change', function () {
         selectProfileImage(bannerPicker.files && bannerPicker.files[0], 'banner');
       });
-      avatarEditButton.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          avatarPicker.click();
-        }
-      });
-      bannerEditButton.addEventListener('keydown', function (event) {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          bannerPicker.click();
-        }
-      });
-
       usernameField.input.addEventListener('input', updatePreview);
       bioInput.addEventListener('input', function () {
         editor.querySelector('.profile-char-count').textContent = bioInput.value.length + '/160 characters';
