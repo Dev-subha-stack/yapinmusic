@@ -621,8 +621,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       resultEl.appendChild(ul);
       if (S.mode === 'daily') {
         resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
-        addDailyLeaderboardPrompt(resultEl, S.won, S.mode);
       }
+      addDailyLeaderboardPrompt(resultEl, S.won, S.mode);
       var acts = el('div', 'acts');
       var copy = el('button', 'btn primary', 'Copy result'); copy.type = 'button';
       var again = el('button', 'btn', 'Play a random one'); again.type = 'button';
@@ -969,8 +969,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       resultEl.appendChild(el('p', 'sub', a.g + ' · ' + a.c + ' · formed ' + a.y));
       if (S.mode === 'daily') {
         resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
-        addDailyLeaderboardPrompt(resultEl, S.won, S.mode);
       }
+      addDailyLeaderboardPrompt(resultEl, S.won, S.mode);
       var acts = el('div', 'acts');
       var copy = el('button', 'btn primary', 'Copy result'); copy.type = 'button';
       var again = el('button', 'btn', 'Play a random one'); again.type = 'button';
