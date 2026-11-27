@@ -288,7 +288,11 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         return !submittedKeys.has(leaderboardScoreKey(score));
       });
       ls.set(pendingLeaderboardKey, remaining);
-      if (leaderboardUI) leaderboardUI.refresh();
+      getPlayerLeaderboardEntry().catch(function (error) {
+        console.warn('Could not refresh the player points after a game.', error);
+      }).finally(function () {
+        if (leaderboardUI) leaderboardUI.refresh();
+      });
     }).finally(function () {
       pendingLeaderboardFlush = false;
     });
@@ -1327,7 +1331,17 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
             console.warn('Could not sync the Site Developers profile picture.', error);
           });
         }
-        var who = el('div', 'who'); who.appendChild(el('div', 'nm', m.name)); who.appendChild(el('div', 'hd', m.handle));
+        var who = el('div', 'who');
+        if (m.profileUserId) {
+          var profileLink = el('a', 'nm team-profile-link', m.name);
+          profileLink.href = '#player/' + encodeURIComponent(String(m.profileUserId)) + '?from=our-team';
+          profileLink.title = 'View ' + m.name + '’s player profile';
+          profileLink.setAttribute('aria-label', 'View ' + m.name + '’s player profile');
+          who.appendChild(profileLink);
+        } else {
+          who.appendChild(el('div', 'nm', m.name));
+        }
+        who.appendChild(el('div', 'hd', m.handle));
         li.appendChild(img); li.appendChild(who); ul.appendChild(li);
       });
       if (!tier.members.length) ul.appendChild(el('li', 'vacant', 'No one in this role yet.'));
@@ -1529,6 +1543,42 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       preview.appendChild(identity);
       var previewBio = el('p', 'profile-preview-bio', profile.bio || 'Your bio will appear here. Tell the community a little about yourself.');
       preview.appendChild(previewBio);
+
+      var totalPoints = Math.max(0, Number(profile.total_points) || 0);
+      var currentRank = rankFor(totalPoints);
+      var pointsCard = el('section', 'profile-points-card');
+      var pointsHeading = el('div', 'profile-points-heading');
+      var pointsTitle = el('div', 'profile-points-copy');
+      pointsTitle.appendChild(el('span', 'profile-points-kicker', 'YOUR POINTS'));
+      pointsTitle.appendChild(el('strong', 'profile-points-total', totalPoints.toLocaleString()));
+      pointsTitle.appendChild(el('small', 'profile-points-caption', 'Total points earned'));
+      pointsHeading.appendChild(pointsTitle);
+      pointsHeading.appendChild(el('span', 'profile-points-rank', currentRank.name));
+      pointsCard.appendChild(pointsHeading);
+
+      var progressTrack = el('div', 'profile-points-track');
+      var progressFill = el('span');
+      progressFill.style.width = currentRank.progress + '%';
+      progressTrack.appendChild(progressFill);
+      pointsCard.appendChild(progressTrack);
+      var progressText = currentRank.next
+        ? (currentRank.next - totalPoints).toLocaleString() + ' points to ' + currentRank.nextName
+        : 'Highest rank unlocked';
+      pointsCard.appendChild(el('p', 'profile-points-next', progressText));
+
+      var careerStats = el('div', 'profile-career-stats');
+      [
+        ['Wins', Number(profile.wins) || 0],
+        ['Games played', Number(profile.games_played) || 0],
+        ['Leaderboard', profile.rank_position ? '#' + profile.rank_position : 'Unranked']
+      ].forEach(function (stat) {
+        var item = el('div', 'profile-career-stat');
+        item.appendChild(el('span', null, stat[0]));
+        item.appendChild(el('strong', null, String(stat[1])));
+        careerStats.appendChild(item);
+      });
+      pointsCard.appendChild(careerStats);
+      preview.appendChild(pointsCard);
       summary.appendChild(preview);
 
       var editor = el('form', 'profile-editor');
@@ -2199,25 +2249,34 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     });
   }
 
+  var publicProfileReturnRoute = 'leaderboard';
+
   function route() {
     closeMobileNav();
-    var hashRoute = location.hash.replace(/^#/, '');
+    var routeParts = location.hash.replace(/^#/, '').split('?');
+    var hashRoute = routeParts[0];
+    var routeQuery = new URLSearchParams(routeParts.slice(1).join('?'));
     var publicProfileId = '';
     var h = hashRoute;
     if (hashRoute.indexOf('player/') === 0) {
       h = 'player-profile';
+      publicProfileReturnRoute = routeQuery.get('from') === 'our-team' ? 'our-team' : 'leaderboard';
       try { publicProfileId = decodeURIComponent(hashRoute.slice(7)); }
       catch (error) { publicProfileId = ''; }
+    } else {
+      publicProfileReturnRoute = 'leaderboard';
     }
     if (VIEWS.indexOf(h) < 0) h = 'home';
     var isPlayerOverlay = h === 'player-profile';
     VIEWS.forEach(function (v) {
-      var keepBoardBehindOverlay = isPlayerOverlay && v === 'leaderboard';
-      document.getElementById('v-' + v).hidden = v !== h && !keepBoardBehindOverlay;
+      var keepBackgroundBehindOverlay = isPlayerOverlay && v === publicProfileReturnRoute;
+      document.getElementById('v-' + v).hidden = v !== h && !keepBackgroundBehindOverlay;
     });
+    var publicProfileClose = document.querySelector('.public-profile-close');
+    if (publicProfileClose) publicProfileClose.href = '#' + publicProfileReturnRoute;
     document.body.classList.toggle('player-profile-open', isPlayerOverlay);
     document.querySelectorAll('[data-nav]').forEach(function (a) {
-      var navRoute = isPlayerOverlay ? 'leaderboard' : h;
+      var navRoute = isPlayerOverlay ? publicProfileReturnRoute : h;
       if (a.dataset.nav === navRoute) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     document.getElementById('band').toggleAttribute('data-home', h === 'home');
@@ -2236,11 +2295,11 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   var publicProfileOverlay = document.getElementById('v-player-profile');
   if (publicProfileOverlay) {
     publicProfileOverlay.addEventListener('click', function (event) {
-      if (event.target === publicProfileOverlay) location.hash = '#leaderboard';
+      if (event.target === publicProfileOverlay) location.hash = '#' + publicProfileReturnRoute;
     });
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape' && !publicProfileOverlay.hidden) {
-        location.hash = '#leaderboard';
+        location.hash = '#' + publicProfileReturnRoute;
       }
     });
   }
