@@ -4,7 +4,7 @@ import { searchBandInfo, searchSongInfo } from '../services/music-info.js';
 import { storage as ls } from '../services/storage.js';
 import {
   getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername, saveProfileDetails,
-  getLeaderboard, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured,
+  getLeaderboard, getPublicProfile, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured,
   getDailyTasks, claimDailyReward
 } from '../services/leaderboard.js';
 import { compressMediaFile, formatMediaBytes } from '../mediaCompressor.js';
@@ -1808,6 +1808,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         var item = el('div', 'lb-row' + (position === 1 ? ' lb-first' : ''));
         var place = el('div', 'lb-place', '#' + position);
         item.appendChild(place);
+        var personLink = entry.user_id ? el('a', 'lb-person-link') : el('div', 'lb-person-link');
+        if (entry.user_id) {
+          personLink.href = '#player/' + encodeURIComponent(String(entry.user_id));
+          personLink.setAttribute('aria-label', 'View ' + entry.username + '’s player profile');
+          personLink.title = 'View player profile';
+        }
         var avatar = el('div', 'lb-row-avatar');
         if (entry.avatar_url) {
           var image = el('img');
@@ -1819,11 +1825,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         } else {
           avatar.textContent = initials(entry.username);
         }
-        item.appendChild(avatar);
+        personLink.appendChild(avatar);
         var identity = el('div', 'lb-identity');
         identity.appendChild(el('strong', null, entry.username));
-        identity.appendChild(el('small', null, (Number(entry.wins) || 0) + ' wins · ' + (Number(entry.games_played) || 0) + ' daily games'));
-        item.appendChild(identity);
+        identity.appendChild(el('small', null, (Number(entry.wins) || 0) + ' wins · ' + (Number(entry.games_played) || 0) + ' games · View profile'));
+        personLink.appendChild(identity);
+        item.appendChild(personLink);
         item.appendChild(el('span', 'lb-rank-tag', rank.name));
         var score = el('div', 'lb-score');
         score.appendChild(el('strong', null, String(Number(entry.total_points) || 0)));
@@ -1875,6 +1882,102 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         refresh();
       },
       refresh: refresh
+    };
+  }
+
+  function createPublicProfileUI() {
+    var root = document.getElementById('v-player-profile');
+    var panel = root && $('[data-public-profile-panel]', root);
+    var requestNumber = 0;
+
+    function initials(name) {
+      return String(name || 'Y').trim().charAt(0).toUpperCase() || 'Y';
+    }
+
+    function render(profile) {
+      if (!panel) return;
+      panel.innerHTML = '';
+      if (!profile) {
+        panel.appendChild(el('div', 'lb-empty', 'This player profile could not be found.'));
+        return;
+      }
+
+      var card = el('article', 'public-player-card');
+      var banner = el('div', 'public-player-banner');
+      if (profile.banner_url) {
+        var bannerImage = el('img');
+        bannerImage.src = profile.banner_url;
+        bannerImage.alt = '';
+        bannerImage.loading = 'lazy';
+        bannerImage.onerror = function () { bannerImage.remove(); };
+        banner.appendChild(bannerImage);
+      }
+      card.appendChild(banner);
+
+      var content = el('div', 'public-player-content');
+      var identity = el('div', 'public-player-identity');
+      var avatar = el('div', 'public-player-avatar');
+      if (profile.avatar_url) {
+        var avatarImage = el('img');
+        avatarImage.src = profile.avatar_url;
+        avatarImage.alt = '';
+        avatarImage.loading = 'lazy';
+        avatarImage.onerror = function () {
+          avatarImage.remove();
+          avatar.textContent = initials(profile.username);
+        };
+        avatar.appendChild(avatarImage);
+      } else {
+        avatar.textContent = initials(profile.username);
+      }
+      identity.appendChild(avatar);
+
+      var nameBlock = el('div', 'public-player-name-block');
+      nameBlock.appendChild(el('h2', null, profile.username || 'Yapin Player'));
+      var rank = rankFor(profile.total_points);
+      var rankLine = rank.name;
+      if (profile.rank_position) rankLine += ' · #' + profile.rank_position + ' on the leaderboard';
+      nameBlock.appendChild(el('p', 'public-player-rank', rankLine));
+      identity.appendChild(nameBlock);
+      content.appendChild(identity);
+
+      var bio = el('p', 'public-player-bio', String(profile.bio || '').trim() || 'This player has not added a bio yet.');
+      content.appendChild(bio);
+
+      var stats = el('div', 'public-player-stats');
+      [
+        ['Points', Number(profile.total_points) || 0],
+        ['Wins', Number(profile.wins) || 0],
+        ['Games played', Number(profile.games_played) || 0]
+      ].forEach(function (stat) {
+        var block = el('div', 'public-player-stat');
+        block.appendChild(el('span', null, stat[0]));
+        block.appendChild(el('strong', null, String(stat[1])));
+        stats.appendChild(block);
+      });
+      content.appendChild(stats);
+      card.appendChild(content);
+      panel.appendChild(card);
+    }
+
+    return {
+      show: function (userId) {
+        var currentRequest = ++requestNumber;
+        if (!panel) return;
+        panel.innerHTML = '';
+        if (!userId) {
+          panel.appendChild(el('div', 'lb-empty', 'This player profile link is invalid.'));
+          return;
+        }
+        panel.appendChild(el('p', 'lb-muted', 'Loading player profile…'));
+        getPublicProfile(userId).then(function (result) {
+          if (currentRequest === requestNumber) render(result);
+        }).catch(function (error) {
+          if (currentRequest !== requestNumber) return;
+          panel.innerHTML = '';
+          panel.appendChild(el('div', 'lb-empty', error.message || 'Could not load this player profile. Please try again.'));
+        });
+      }
     };
   }
 
@@ -2066,14 +2169,22 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   }
 
   var leaderboardUI = createLeaderboardUI();
+  var publicProfileUI = createPublicProfileUI();
   var tasksUI = createTasksUI();
   var profileUI = leaderboardUI;
 
   /* ============ ROUTES ============ */
 
-  var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'tasks', 'profile', 'our-team'];
+  var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'tasks', 'profile', 'player-profile', 'our-team'];
   function route() {
-    var h = location.hash.replace('#', '');
+    var hashRoute = location.hash.replace(/^#/, '');
+    var publicProfileId = '';
+    var h = hashRoute;
+    if (hashRoute.indexOf('player/') === 0) {
+      h = 'player-profile';
+      try { publicProfileId = decodeURIComponent(hashRoute.slice(7)); }
+      catch (error) { publicProfileId = ''; }
+    }
     if (VIEWS.indexOf(h) < 0) h = 'home';
     VIEWS.forEach(function (v) { document.getElementById('v-' + v).hidden = v !== h; });
     document.querySelectorAll('[data-nav]').forEach(function (a) {
@@ -2083,6 +2194,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     active = games[h] || null;
     if (active) active.init();
     if ((h === 'leaderboard' || h === 'profile') && leaderboardUI) leaderboardUI.init();
+    if (h === 'player-profile' && publicProfileUI) publicProfileUI.show(publicProfileId);
     if (h === 'tasks' && tasksUI) tasksUI.init();
     if (queuedRandomGame === h && active && active.random) {
       active.random();
