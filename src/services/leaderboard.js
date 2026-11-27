@@ -76,7 +76,7 @@ async function loadProfile() {
   return currentProfile;
 }
 
-async function refreshAccountState() {
+async function refreshAccountState(options = {}) {
   if (!authClient) {
     authLoading = false;
     currentSession = null;
@@ -86,23 +86,58 @@ async function refreshAccountState() {
     return getAccountState();
   }
   if (refreshInFlight) return refreshInFlight;
+
+  const silent = Boolean(options && options.silent);
+  const hadAccount = Boolean(currentSession && currentUser);
+  const previousSession = currentSession;
+  const previousUser = currentUser;
+  const previousProfile = currentProfile;
+  const previousUserId = previousUser && previousUser.id;
+
   refreshInFlight = (async () => {
-    authLoading = true;
-    notifyAccount();
+    // A passive focus/visibility refresh must not replace an active profile editor.
+    // In particular, opening a native file picker returns focus to the window.
+    if (!silent || !hadAccount) {
+      authLoading = true;
+      notifyAccount();
+    }
+
+    let shouldNotify = !silent || !hadAccount;
     try {
       await readSession();
-      if (currentSession && currentUser) await loadProfile();
-      else currentProfile = null;
+      if (currentSession && currentUser) {
+        // Keep the current profile object during a passive refresh for the same user.
+        // The token may refresh, but the open editor and its selected File objects stay intact.
+        if (!silent || !hadAccount || previousUserId !== currentUser.id) {
+          await loadProfile();
+        } else {
+          currentProfile = previousProfile;
+        }
+      } else {
+        currentProfile = null;
+      }
       accountError = null;
+      const nextUserId = currentUser && currentUser.id;
+      if (previousUserId !== nextUserId) shouldNotify = true;
     } catch (error) {
       accountError = error.message || 'Could not restore your Neon Auth session.';
-      currentSession = null;
-      currentUser = null;
-      currentProfile = null;
+      if (silent && hadAccount) {
+        // A temporary background/network failure should not sign the player out
+        // or discard unsaved changes in the profile editor.
+        currentSession = previousSession;
+        currentUser = previousUser;
+        currentProfile = previousProfile;
+        shouldNotify = false;
+      } else {
+        currentSession = null;
+        currentUser = null;
+        currentProfile = null;
+        shouldNotify = true;
+      }
     } finally {
       authLoading = false;
       refreshInFlight = null;
-      notifyAccount();
+      if (shouldNotify) notifyAccount();
     }
     return getAccountState();
   })();
@@ -111,9 +146,9 @@ async function refreshAccountState() {
 
 if (authClient && typeof window !== 'undefined') {
   refreshAccountState();
-  window.addEventListener('focus', () => { refreshAccountState(); });
+  window.addEventListener('focus', () => { refreshAccountState({ silent: true }); });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') refreshAccountState();
+    if (document.visibilityState === 'visible') refreshAccountState({ silent: true });
   });
 }
 
