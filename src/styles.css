@@ -1074,3 +1074,44 @@ select {
   .profile-preview-identity { padding-inline:13px; gap:10px; }
   .profile-preview-bio { padding-inline:13px; }
 }
+
+
+/* ===== Profile media upload controls and live Discord-style preview ===== */
+.profile-cover { isolation:isolate; }
+.profile-image-edit {
+  position:absolute; z-index:3; display:inline-flex; align-items:center; justify-content:center;
+  min-height:34px; padding:8px 12px; border:1px solid rgba(255,245,238,.25);
+  border-radius:999px; background:rgba(22,15,17,.76); color:#FFF3EA;
+  font:700 .78rem var(--f-body); cursor:pointer; backdrop-filter:blur(10px);
+  box-shadow:0 5px 18px rgba(0,0,0,.22); transition:background .15s,border-color .15s,transform .15s;
+}
+.profile-image-edit:hover { background:rgba(255,107,53,.94); border-color:transparent; color:#2B1009; }
+.profile-image-edit:disabled { opacity:.55; cursor:wait; }
+.profile-banner-edit { right:14px; bottom:14px; }
+.profile-preview-avatar { position:relative; }
+.profile-avatar-edit {
+  right:1px; bottom:1px; min-height:27px; width:27px; height:27px; padding:0;
+  border-radius:50%; font-size:.65rem; line-height:1;
+}
+.profile-compression-status {
+  display:grid; gap:8px; padding:12px 13px; border:1px solid var(--line);
+  border-radius:13px; background:var(--bg); color:var(--fg);
+}
+.profile-compression-status[hidden] { display:none; }
+.profile-compression-top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.profile-compression-top strong { font-size:.83rem; }
+.profile-compression-top span { color:var(--muted); font-size:.78rem; font-variant-numeric:tabular-nums; }
+.profile-compression-track { height:7px; overflow:hidden; border-radius:999px; background:var(--line); }
+.profile-compression-track span { display:block; height:100%; border-radius:inherit; background:var(--accent); transition:width .18s ease; }
+.profile-compression-status p { color:var(--muted); font-size:.8rem; line-height:1.45; }
+.profile-compression-status small { color:var(--muted); font-size:.73rem; }
+.profile-compression-status.is-error { border-color:#B85B55; }
+.profile-compression-status.is-error .profile-compression-track span { background:#D56C60; }
+.profile-compression-status.is-done .profile-compression-track span { background:#39986C; }
+:root[data-theme="dark"] .profile-compression-status { background:#1B1215; border-color:#503238; }
+@media (max-width:520px) {
+  .profile-cover { height:150px; }
+  .profile-banner-edit { right:10px; bottom:10px; min-height:32px; padding-inline:10px; }
+  .profile-preview-avatar { width:76px; height:76px; }
+  .profile-preview-identity { margin-top:-34px; }
+}
