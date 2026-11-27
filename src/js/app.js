@@ -2170,31 +2170,133 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'tasks', 'profile', 'player-profile', 'our-team'];
   var mobileNavToggle = document.getElementById('mobile-nav-toggle');
   var mobileNav = document.getElementById('main-navigation');
+  var navMenuPanel = document.getElementById('navigation-menu');
+  var navHoverQuery = window.matchMedia ? window.matchMedia('(hover: hover) and (pointer: fine)') : null;
 
-  function closeMobileNav() {
-    if (!mobileNavToggle || !mobileNav) return;
-    mobileNav.classList.remove('is-open');
-    mobileNavToggle.setAttribute('aria-expanded', 'false');
-    mobileNavToggle.setAttribute('aria-label', 'Open navigation');
+  function navCanHover() { return !!(navHoverQuery && navHoverQuery.matches); }
+
+  function closeMenuGroup(group) {
+    if (!group) return;
+    var toggle = group.querySelector(':scope > [data-menu-toggle]');
+    var submenu = group.querySelector(':scope > .nav-submenu');
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    if (submenu) {
+      submenu.hidden = true;
+      Array.prototype.forEach.call(submenu.querySelectorAll('[data-menu-group]'), closeMenuGroup);
+    }
+    group.classList.remove('is-open');
   }
 
-  if (mobileNavToggle && mobileNav) {
+  function setMenuGroupOpen(group, open) {
+    if (!group) return;
+    if (open && group.parentElement) {
+      Array.prototype.forEach.call(group.parentElement.children, function (sibling) {
+        if (sibling !== group && sibling.matches && sibling.matches('[data-menu-group]')) closeMenuGroup(sibling);
+      });
+    }
+    var toggle = group.querySelector(':scope > [data-menu-toggle]');
+    var submenu = group.querySelector(':scope > .nav-submenu');
+    if (!toggle || !submenu) return;
+    toggle.setAttribute('aria-expanded', String(open));
+    submenu.hidden = !open;
+    group.classList.toggle('is-open', open);
+    if (!open) Array.prototype.forEach.call(submenu.querySelectorAll('[data-menu-group]'), closeMenuGroup);
+  }
+
+  function closeAllMenuGroups() {
+    if (!navMenuPanel) return;
+    Array.prototype.forEach.call(navMenuPanel.querySelectorAll(':scope > [data-menu-group]'), closeMenuGroup);
+  }
+
+  function closeMobileNav() {
+    if (!mobileNavToggle || !mobileNav || !navMenuPanel) return;
+    mobileNavToggle.setAttribute('aria-expanded', 'false');
+    mobileNavToggle.setAttribute('aria-label', 'Open navigation menu');
+    navMenuPanel.hidden = true;
+    closeAllMenuGroups();
+  }
+
+  function openMobileNav() {
+    if (!mobileNavToggle || !navMenuPanel) return;
+    mobileNavToggle.setAttribute('aria-expanded', 'true');
+    mobileNavToggle.setAttribute('aria-label', 'Close navigation menu');
+    navMenuPanel.hidden = false;
+  }
+
+  if (mobileNavToggle && mobileNav && navMenuPanel) {
     mobileNavToggle.addEventListener('click', function () {
-      var opening = mobileNavToggle.getAttribute('aria-expanded') !== 'true';
-      mobileNavToggle.setAttribute('aria-expanded', String(opening));
-      mobileNavToggle.setAttribute('aria-label', opening ? 'Close navigation' : 'Open navigation');
-      mobileNav.classList.toggle('is-open', opening);
+      if (mobileNavToggle.getAttribute('aria-expanded') === 'true') closeMobileNav();
+      else openMobileNav();
     });
+
     mobileNav.addEventListener('click', function (event) {
-      if (event.target.closest('a')) closeMobileNav();
+      var groupToggle = event.target.closest('[data-menu-toggle]');
+      if (groupToggle && mobileNav.contains(groupToggle)) {
+        var group = groupToggle.closest('[data-menu-group]');
+        setMenuGroupOpen(group, groupToggle.getAttribute('aria-expanded') !== 'true');
+        return;
+      }
+      if (event.target.closest('a[data-nav]')) closeMobileNav();
     });
-    document.addEventListener('click', function (event) {
-      if (!event.target.closest('.site-head')) closeMobileNav();
+
+    mobileNav.addEventListener('pointerover', function (event) {
+      if (!navCanHover()) return;
+      var group = event.target.closest('[data-menu-group]');
+      if (group && mobileNav.contains(group)) setMenuGroupOpen(group, true);
     });
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape' && mobileNav.classList.contains('is-open')) {
+
+    mobileNav.addEventListener('pointerout', function (event) {
+      if (!navCanHover()) return;
+      var group = event.target.closest('[data-menu-group]');
+      if (group && !group.contains(event.relatedTarget)) closeMenuGroup(group);
+    });
+
+    mobileNav.addEventListener('focusin', function (event) {
+      var group = event.target.closest('[data-menu-group]');
+      if (group) setMenuGroupOpen(group, true);
+    });
+
+    mobileNav.addEventListener('focusout', function (event) {
+      var group = event.target.closest('[data-menu-group]');
+      if (group && !group.contains(event.relatedTarget)) closeMenuGroup(group);
+      if (!mobileNav.contains(event.relatedTarget)) closeMobileNav();
+    });
+
+    document.addEventListener('pointerdown', function (event) {
+      if (!mobileNav.contains(event.target)) closeMobileNav();
+    });
+
+    mobileNav.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && mobileNavToggle.getAttribute('aria-expanded') === 'true') {
         closeMobileNav();
         mobileNavToggle.focus();
+        return;
+      }
+      var groupToggle = event.target.closest('[data-menu-toggle]');
+      if (!groupToggle) return;
+      if (event.key === 'ArrowRight') {
+        var group = groupToggle.closest('[data-menu-group]');
+        setMenuGroupOpen(group, true);
+        var submenu = group.querySelector(':scope > .nav-submenu');
+        var firstControl = submenu && submenu.querySelector('a, [data-menu-toggle]');
+        if (firstControl) { event.preventDefault(); firstControl.focus(); }
+      } else if (event.key === 'ArrowLeft') {
+        var parentGroup = groupToggle.closest('[data-menu-group]');
+        if (parentGroup) {
+          event.preventDefault();
+          closeMenuGroup(parentGroup);
+          var parentToggle = parentGroup.querySelector(':scope > [data-menu-toggle]');
+          if (parentToggle) parentToggle.focus();
+        }
+      }
+    });
+
+    mobileNavToggle.addEventListener('keydown', function (event) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        openMobileNav();
+        var firstItem = navMenuPanel.querySelector('a, [data-menu-toggle]');
+        if (firstItem) firstItem.focus();
       }
     });
   }
@@ -2220,6 +2322,17 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var navRoute = isPlayerOverlay ? 'leaderboard' : h;
       if (a.dataset.nav === navRoute) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
+    if (navMenuPanel) {
+      Array.prototype.forEach.call(navMenuPanel.querySelectorAll('[data-menu-group]'), function (group) {
+        group.classList.remove('has-current');
+      });
+      var activeNavLink = navMenuPanel.querySelector('[data-nav][aria-current="page"]');
+      var activeGroup = activeNavLink && activeNavLink.closest('[data-menu-group]');
+      while (activeGroup) {
+        activeGroup.classList.add('has-current');
+        activeGroup = activeGroup.parentElement && activeGroup.parentElement.closest('[data-menu-group]');
+      }
+    }
     document.getElementById('band').toggleAttribute('data-home', h === 'home');
     active = games[h] || null;
     if (active) active.init();
