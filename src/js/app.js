@@ -4,7 +4,7 @@ import { searchBandInfo, searchSongInfo } from '../services/music-info.js';
 import { storage as ls } from '../services/storage.js';
 import {
   getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername,
-  getLeaderboard, rankFor, submitScore, isLeaderboardConfigured
+  getLeaderboard, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured
 } from '../services/leaderboard.js';
 import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
@@ -218,23 +218,62 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  var pendingLeaderboardKey = 'yapin:leaderboard:pending';
+  var pendingLeaderboardFlush = false;
+
+  function pendingLeaderboardScores() {
+    return ls.get(pendingLeaderboardKey) || [];
+  }
+
+  function rememberPendingLeaderboardScore(score) {
+    var pending = pendingLeaderboardScores().filter(function (item) {
+      return !(item.gameMode === score.gameMode && item.difficulty === score.difficulty && item.puzzleDate === score.puzzleDate);
+    });
+    pending.push(score);
+    ls.set(pendingLeaderboardKey, pending);
+  }
+
   function submitDailyLeaderboardScore(gameMode, difficulty, won, guessesUsed) {
-    var account = getAccountState();
-    if (!account.configured || !account.user || !account.profile) return;
-    submitScore({
+    var score = {
       gameMode: gameMode,
       difficulty: difficulty,
       won: Boolean(won),
       guessesUsed: guessesUsed,
       puzzleDate: localPuzzleDate()
-    }).then(function (result) {
-      if (result && result.saved) {
-        if (!result.duplicate && won) toast('Daily score added · +' + result.points + ' points');
-        if (leaderboardUI) leaderboardUI.refresh();
-      }
-    }).catch(function (error) {
-      console.warn('Leaderboard score was not saved.', error);
-      toast('Your result was saved locally, but the leaderboard could not be updated.');
+    };
+    rememberPendingLeaderboardScore(score);
+    flushPendingLeaderboardScores();
+  }
+
+  function flushPendingLeaderboardScores() {
+    var account = getAccountState();
+    if (pendingLeaderboardFlush || !account.configured || !account.user || !account.profile || !isLeaderboardConfigured()) return;
+    var pending = pendingLeaderboardScores();
+    if (!pending.length) return;
+    pendingLeaderboardFlush = true;
+    Promise.all(pending.map(function (score) {
+      return submitScore(score).then(function (result) {
+        if (result && result.saved) {
+          if (!result.duplicate && score.won) toast('Daily score added · +' + result.points + ' points');
+          return score;
+        }
+        return null;
+      }).catch(function (error) {
+        console.warn('Leaderboard score is queued for another attempt.', error);
+        return null;
+      });
+    })).then(function (completed) {
+      var submitted = completed.filter(Boolean);
+      if (!submitted.length) return;
+      var remaining = pendingLeaderboardScores().filter(function (score) {
+        return !submitted.some(function (done) {
+          return done.gameMode === score.gameMode && done.difficulty === score.difficulty && done.puzzleDate === score.puzzleDate;
+        });
+      });
+      ls.set(pendingLeaderboardKey, remaining);
+      if (leaderboardUI) leaderboardUI.refresh();
+    }).finally(function () {
+      pendingLeaderboardFlush = false;
     });
   }
 
@@ -1287,6 +1326,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     var authMode = 'signup';
     var accountState = getAccountState();
     var entries = [];
+    var playerEntry = null;
     var initialized = false;
     var unsubscribe = null;
     var loadingBoard = false;
@@ -1353,7 +1393,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           return;
         }
 
-        var row = entries.find(function (item) { return item.user_id === accountState.user.id; });
+        var row = playerEntry || entries.find(function (item) { return item.user_id === accountState.user.id; });
         var points = row ? Number(row.total_points) || 0 : 0;
         var rank = rankFor(points);
         var summary = el('div', 'lb-account-summary');
@@ -1525,8 +1565,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       if (refreshButton) refreshButton.disabled = true;
       boardBox.classList.add('lb-refreshing');
       try {
-        var result = await getLeaderboard({ limit: 100 });
-        entries = result.entries || [];
+        var results = await Promise.all([
+          getLeaderboard({ limit: 100 }),
+          accountState.user && accountState.profile ? getPlayerLeaderboardEntry() : Promise.resolve(null)
+        ]);
+        entries = results[0].entries || [];
+        playerEntry = results[1];
         renderBoard();
         renderAccount(accountState);
       } catch (error) {
@@ -1548,7 +1592,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           initialized = true;
           unsubscribe = subscribeAccount(function (state) {
             accountState = state;
+            if (!state.user || !state.profile) playerEntry = null;
             renderAccount(state);
+            flushPendingLeaderboardScores();
           });
         }
         refresh();
