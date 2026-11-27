@@ -2018,7 +2018,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           grid.appendChild(card);
         });
         page.appendChild(grid);
-        page.appendChild(el('p', 'tasks-footnote', 'Daily game missions count finished Daily rounds only. Random practice rounds do not count. Each reward can be claimed once per day.'));
+        page.appendChild(el('p', 'tasks-footnote', 'Daily missions count completed Daily and Random rounds. Each mission reward can be claimed once per day.'));
         if (errorMessage) page.appendChild(el('p', 'lb-message', errorMessage));
       }
       root.appendChild(page);
