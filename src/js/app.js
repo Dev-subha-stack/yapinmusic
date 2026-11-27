@@ -1335,6 +1335,13 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       tier.members.forEach(function (m) {
         var li = el('li', 'member');
         var img = el('img'); img.src = m.avatar || ICON; img.alt = ''; img.width = 56; img.height = 56;
+        if (m.profileUserId) {
+          getPublicProfile(m.profileUserId).then(function (profile) {
+            if (profile && profile.avatar_url) img.src = profile.avatar_url;
+          }).catch(function (error) {
+            console.warn('Could not sync the Site Developers profile picture.', error);
+          });
+        }
         var who = el('div', 'who'); who.appendChild(el('div', 'nm', m.name)); who.appendChild(el('div', 'hd', m.handle));
         li.appendChild(img); li.appendChild(who); ul.appendChild(li);
       });
