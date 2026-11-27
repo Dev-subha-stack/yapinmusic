@@ -4,7 +4,8 @@ import { searchBandInfo, searchSongInfo } from '../services/music-info.js';
 import { storage as ls } from '../services/storage.js';
 import {
   getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername, saveProfileDetails,
-  getLeaderboard, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured
+  getLeaderboard, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured,
+  getDailyTasks, claimDailyReward
 } from '../services/leaderboard.js';
 import { compressMediaFile, formatMediaBytes } from '../mediaCompressor.js';
 import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
@@ -290,6 +291,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       link.href = '#leaderboard';
       note.appendChild(link);
     }
+    var taskLink = el('a', 'btn', 'Daily tasks');
+    taskLink.href = '#tasks';
+    note.appendChild(taskLink);
     resultEl.appendChild(note);
   }
 
@@ -1479,7 +1483,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       cover.appendChild(coverPlaceholder);
       var bannerPicker = el('input', 'profile-file-input');
       bannerPicker.type = 'file';
-      bannerPicker.accept = '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif';
+      bannerPicker.accept = '.png,.apng,.jpg,.jpeg,.webp,.gif,image/png,image/apng,image/jpeg,image/webp,image/gif';
       bannerPicker.setAttribute('aria-label', 'Choose a profile banner from your computer');
       var bannerEditButton = el('label', 'profile-image-edit profile-banner-edit', 'Change banner');
       bannerEditButton.appendChild(bannerPicker);
@@ -1498,7 +1502,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       avatarWrap.appendChild(avatarFallback);
       var avatarPicker = el('input', 'profile-file-input');
       avatarPicker.type = 'file';
-      avatarPicker.accept = '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif';
+      avatarPicker.accept = '.png,.apng,.jpg,.jpeg,.webp,.gif,image/png,image/apng,image/jpeg,image/webp,image/gif';
       avatarPicker.setAttribute('aria-label', 'Choose a profile picture from your computer');
       var avatarEditButton = el('label', 'profile-image-edit profile-avatar-edit', 'Edit');
       avatarEditButton.appendChild(avatarPicker);
@@ -1530,7 +1534,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       editor.appendChild(bioLabel);
       editor.appendChild(el('p', 'profile-char-count', (bioInput.value.length) + '/160 characters'));
 
-      editor.appendChild(el('p', 'profile-image-help', 'Choose images directly from your computer. No image links needed.'));
+      editor.appendChild(el('p', 'profile-image-help', 'Choose images directly from your computer. Animated GIF, APNG and WebP files keep their motion, with an instant preview.'));
 
       var compressionBox = el('div', 'profile-compression-status');
       compressionBox.hidden = true;
@@ -1609,11 +1613,24 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         updateLiveHeaderAvatar(avatarUrl);
       }
 
+      function normaliseProfileImageFile(file) {
+        if (!file) return null;
+        var extension = String(file.name || '').toLowerCase().match(/\.([a-z0-9]+)$/);
+        var types = { png:'image/png', apng:'image/apng', jpg:'image/jpeg', jpeg:'image/jpeg', webp:'image/webp', gif:'image/gif' };
+        var mime = /^image\/(png|apng|jpeg|webp|gif)$/i.test(file.type || '')
+          ? String(file.type).toLowerCase()
+          : (extension && types[extension[1]]);
+        if (!mime) return null;
+        if (file.type === mime) return file;
+        return new File([file], file.name || 'profile-image.png', { type: mime, lastModified: file.lastModified || Date.now() });
+      }
+
       function selectProfileImage(file, kind) {
         if (!file) return;
-        if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type) && !/\.(png|jpe?g|webp|gif)$/i.test(file.name || '')) {
-          setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose a JPG, PNG, WebP or GIF image.' });
-          toast('Please choose a JPG, PNG, WebP or GIF image.');
+        file = normaliseProfileImageFile(file);
+        if (!file) {
+          setCompressionStatus({ phase: 'error', progress: 100, message: 'Choose a JPG, PNG, animated PNG, WebP or GIF image.' });
+          toast('Please choose a supported image file.');
           return;
         }
         if (file.size > 20 * 1024 * 1024) {
@@ -1621,7 +1638,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           toast('Choose an image smaller than 20 MB.');
           return;
         }
-
         var isAvatar = kind === 'avatar';
         var objectUrl = URL.createObjectURL(file);
         revokeObjectUrl(kind);
@@ -1635,23 +1651,19 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           bannerPreviewSource = objectUrl;
         }
         updatePreview();
-
-        // Show the selected local image immediately. Compression happens only on Save,
-        // following Chatter's profile-upload flow, so previewing never depends on the encoder.
         setCompressionStatus({
           phase: 'done',
           progress: 100,
           originalSize: file.size,
           outputSize: file.size,
-          message: (isAvatar ? 'Profile photo' : 'Profile banner') + ' selected. Preview is live; it will be compressed when you save.'
+          message: (isAvatar ? 'Profile photo' : 'Profile banner') + ' selected. Preview is live; animation will be preserved when you save.'
         });
       }
-
       async function compressSelectedImage(file, kind) {
         if (!file) return null;
         var isAvatar = kind === 'avatar';
-        var maxStoredBytes = isAvatar ? 450 * 1024 : 1.2 * 1024 * 1024;
-        var maxDataLength = isAvatar ? 900000 : 1800000;
+        var maxStoredBytes = isAvatar ? 900 * 1024 : 1.2 * 1024 * 1024;
+        var maxDataLength = isAvatar ? 1300000 : 1800000;
         var result = await compressMediaFile(file, {
           maxDimension: isAvatar ? 512 : 1800,
           cropSquare: isAvatar,
@@ -1665,7 +1677,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           }
         });
         var chosen = result.file;
-        if (!/^image\/(webp|png|jpe?g|gif)$/i.test(chosen.type)) {
+        if (!/^image\/(webp|png|apng|jpe?g|gif)$/i.test(chosen.type)) {
           throw new Error('This image format could not be prepared. Try a JPG or PNG image.');
         }
         if (chosen.size > maxStoredBytes) {
