@@ -1,96 +1,127 @@
-import { createClient } from '@supabase/supabase-js';
+import { createAuthClient } from '@neondatabase/auth';
+import { BetterAuthVanillaAdapter } from '@neondatabase/auth/vanilla/adapters';
 
 const env = import.meta.env || {};
-const projectUrl = String(env.VITE_SUPABASE_URL || '').trim();
-const publicKey = String(env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || '').trim();
+const authUrl = String(env.VITE_NEON_AUTH_URL || '').trim();
 
-export const supabase = projectUrl && publicKey
-  ? createClient(projectUrl, publicKey, {
-      auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
+export const authClient = authUrl
+  ? createAuthClient(authUrl, {
+      adapter: BetterAuthVanillaAdapter({
+        fetchOptions: { credentials: 'include' }
+      })
     })
   : null;
 
 let currentSession = null;
+let currentUser = null;
 let currentProfile = null;
-let authLoading = Boolean(supabase);
+let authLoading = Boolean(authClient);
 let accountError = null;
 let adapter = null;
+let refreshInFlight = null;
 const accountListeners = new Set();
 
 function notifyAccount() {
   const state = getAccountState();
   accountListeners.forEach((listener) => {
-    try { listener(state); } catch (error) { console.warn('Account listener failed.', error); }
+    try { listener(state); }
+    catch (error) { console.warn('Account listener failed.', error); }
   });
 }
 
-async function loadProfile(userId) {
-  if (!supabase || !userId) {
+function apiErrorMessage(body, fallback) {
+  return body && typeof body.error === 'string' ? body.error : fallback;
+}
+
+async function apiRequest(path, options = {}, tokenRequired = true) {
+  const headers = new Headers(options.headers || {});
+  if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (tokenRequired) {
+    const session = currentSession || await readSession();
+    const token = session && session.token;
+    if (!token) throw new Error('Sign in to use your player account.');
+    headers.set('Authorization', 'Bearer ' + token);
+  }
+  const response = await fetch(path, {
+    ...options,
+    headers,
+    credentials: 'same-origin',
+    cache: 'no-store'
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(apiErrorMessage(body, 'The request could not be completed.'));
+    error.status = response.status;
+    throw error;
+  }
+  return body;
+}
+
+async function readSession() {
+  if (!authClient) return null;
+  const result = await authClient.getSession();
+  if (result.error) throw result.error;
+  currentSession = result.data && result.data.session ? result.data.session : null;
+  currentUser = result.data && result.data.user ? result.data.user : null;
+  return currentSession;
+}
+
+async function loadProfile() {
+  if (!currentSession || !currentUser) {
     currentProfile = null;
-    authLoading = false;
-    notifyAccount();
     return null;
   }
-  const { data, error } = await supabase.from('profiles')
-    .select('id, username, avatar_url')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  currentProfile = data || null;
-  authLoading = false;
-  accountError = null;
-  notifyAccount();
+  const result = await apiRequest('/api/profile', { method: 'GET' });
+  currentProfile = result.profile || null;
   return currentProfile;
 }
 
-if (supabase) {
-  supabase.auth.getSession().then(async ({ data, error }) => {
-    if (error) accountError = error.message;
-    currentSession = data && data.session ? data.session : null;
-    if (currentSession) {
-      try { await loadProfile(currentSession.user.id); }
-      catch (profileError) {
-        accountError = profileError.message;
-        authLoading = false;
-        notifyAccount();
-      }
-    } else {
+async function refreshAccountState() {
+  if (!authClient) {
+    authLoading = false;
+    currentSession = null;
+    currentUser = null;
+    currentProfile = null;
+    notifyAccount();
+    return getAccountState();
+  }
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    authLoading = true;
+    notifyAccount();
+    try {
+      await readSession();
+      if (currentSession && currentUser) await loadProfile();
+      else currentProfile = null;
+      accountError = null;
+    } catch (error) {
+      accountError = error.message || 'Could not restore your Neon Auth session.';
+      currentSession = null;
+      currentUser = null;
+      currentProfile = null;
+    } finally {
       authLoading = false;
+      refreshInFlight = null;
       notifyAccount();
     }
-  }).catch((error) => {
-    accountError = error.message;
-    authLoading = false;
-    notifyAccount();
-  });
+    return getAccountState();
+  })();
+  return refreshInFlight;
+}
 
-  supabase.auth.onAuthStateChange((_event, nextSession) => {
-    currentSession = nextSession;
-    currentProfile = null;
-    authLoading = Boolean(nextSession);
-    accountError = null;
-    notifyAccount();
-    Promise.resolve().then(async () => {
-      if (!nextSession) {
-        authLoading = false;
-        notifyAccount();
-        return;
-      }
-      try { await loadProfile(nextSession.user.id); }
-      catch (error) {
-        accountError = error.message;
-        authLoading = false;
-        notifyAccount();
-      }
-    });
+if (authClient && typeof window !== 'undefined') {
+  refreshAccountState();
+  window.addEventListener('focus', () => { refreshAccountState(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshAccountState();
   });
 }
 
 export function getAccountState() {
   return {
-    configured: Boolean(supabase),
+    configured: Boolean(authClient),
     loading: authLoading,
-    user: currentSession ? currentSession.user : null,
+    user: currentUser,
     profile: currentProfile,
     error: accountError
   };
@@ -103,116 +134,116 @@ export function subscribeAccount(listener) {
   return () => accountListeners.delete(listener);
 }
 
-export async function signUp({ email, password, username }) {
-  if (!supabase) throw new Error('Account services are not connected yet.');
-  const cleanName = String(username || '').trim();
-  if (!/^[\p{L}\p{N}_. -]{3,24}$/u.test(cleanName)) {
+function validateUsername(value) {
+  const username = String(value || '').trim();
+  if (!/^[\p{L}\p{N}_. -]{3,24}$/u.test(username)) {
     throw new Error('Choose a public name with 3–24 letters, numbers, spaces, dots, dashes or underscores.');
   }
-  const { data, error } = await supabase.auth.signUp({
-    email: String(email || '').trim(),
-    password,
-    options: { data: { username: cleanName } }
-  });
-  if (error) throw error;
-  if (data.session) {
-    currentSession = data.session;
-    await saveUsername(cleanName);
-  }
-  return { confirmationPending: !data.session, user: data.user || null };
+  return username;
 }
 
-export async function signIn({ email, password }) {
-  if (!supabase) throw new Error('Account services are not connected yet.');
-  const { data, error } = await supabase.auth.signInWithPassword({
+export async function signUp({ email, password, username }) {
+  if (!authClient) throw new Error('Neon Auth is not configured on this site yet.');
+  const cleanName = validateUsername(username);
+  const result = await authClient.signUp.email({
+    name: cleanName,
     email: String(email || '').trim(),
     password
   });
-  if (error) throw error;
-  currentSession = data.session;
-  const loaded = await loadProfile(data.user.id);
-  if (!loaded && data.user.user_metadata && data.user.user_metadata.username) {
-    await saveUsername(data.user.user_metadata.username);
+  if (result.error) throw result.error;
+  await refreshAccountState();
+  if (currentSession && currentUser) {
+    await saveUsername(cleanName);
   }
-  return data.user;
+  return { confirmationPending: !currentSession, user: currentUser || (result.data && result.data.user) || null };
 }
 
-export async function saveUsername(username) {
-  if (!supabase || !currentSession) throw new Error('Sign in before choosing a leaderboard name.');
-  const cleanName = String(username || '').trim();
-  if (!/^[\p{L}\p{N}_. -]{3,24}$/u.test(cleanName)) {
-    throw new Error('Choose a public name with 3–24 letters, numbers, spaces, dots, dashes or underscores.');
+export async function signIn({ email, password }) {
+  if (!authClient) throw new Error('Neon Auth is not configured on this site yet.');
+  const result = await authClient.signIn.email({
+    email: String(email || '').trim(),
+    password
+  });
+  if (result.error) throw result.error;
+  await refreshAccountState();
+  if (currentSession && currentUser && !currentProfile && currentUser.name) {
+    await saveUsername(currentUser.name);
   }
-  const { data, error } = await supabase.from('profiles')
-    .upsert({ id: currentSession.user.id, username: cleanName }, { onConflict: 'id' })
-    .select('id, username, avatar_url')
-    .single();
-  if (error) throw error;
-  currentProfile = data;
+  return currentUser;
+}
+
+export async function saveUsername(value) {
+  if (!authClient || !currentSession) throw new Error('Sign in before choosing a leaderboard name.');
+  const username = validateUsername(value);
+  const result = await apiRequest('/api/profile', {
+    method: 'POST',
+    body: JSON.stringify({ username })
+  });
+  currentProfile = result.profile || null;
   accountError = null;
   notifyAccount();
-  return data;
+  return currentProfile;
 }
 
 export async function signOut() {
-  if (!supabase) return;
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  if (!authClient) return;
+  const result = await authClient.signOut();
+  if (result.error) throw result.error;
   currentSession = null;
+  currentUser = null;
   currentProfile = null;
+  accountError = null;
   authLoading = false;
   notifyAccount();
 }
 
 export function isLeaderboardConfigured() {
-  return Boolean(adapter || supabase);
+  return Boolean(adapter || (authUrl && authClient));
 }
 
 export async function getLeaderboard(options = {}) {
   if (adapter) return adapter.getLeaderboard(options);
-  if (!supabase) return { configured: false, entries: [] };
+  if (!authUrl) return { configured: false, entries: [] };
   const limit = Math.max(1, Math.min(100, Number(options.limit) || 100));
-  const { data, error } = await supabase.from('player_leaderboard')
-    .select('user_id, username, total_points, wins, games_played, rank_position')
-    .order('total_points', { ascending: false })
-    .order('wins', { ascending: false })
-    .order('username', { ascending: true })
-    .limit(limit);
-  if (error) throw error;
-  return { configured: true, entries: data || [] };
+  const response = await fetch('/api/leaderboard?limit=' + limit, {
+    method: 'GET',
+    credentials: 'same-origin',
+    cache: 'no-store'
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(apiErrorMessage(body, 'The leaderboard could not be loaded.'));
+  return { configured: true, entries: body.entries || [] };
 }
 
 export async function getPlayerLeaderboardEntry() {
-  if (!supabase || !currentSession) return null;
-  const { data, error } = await supabase.from('player_leaderboard')
-    .select('user_id, username, total_points, wins, games_played, rank_position')
-    .eq('user_id', currentSession.user.id)
-    .maybeSingle();
-  if (error) throw error;
-  return data || null;
+  if (!authClient || !currentSession) return null;
+  const result = await apiRequest('/api/profile', { method: 'GET' });
+  currentProfile = result.profile || null;
+  return currentProfile;
 }
 
 export async function submitScore(score) {
   if (adapter) return adapter.submitScore(score);
-  if (!supabase) return { saved: false, reason: 'backend-not-configured' };
+  if (!authClient) return { saved: false, reason: 'backend-not-configured' };
   if (!currentSession) return { saved: false, reason: 'not-signed-in' };
   if (!currentProfile) return { saved: false, reason: 'profile-required' };
-
-  const { data, error } = await supabase.functions.invoke('submit-score', {
-    body: {
-      game_mode: score.gameMode,
-      difficulty: score.difficulty,
-      won: Boolean(score.won),
-      guesses_used: Number(score.guessesUsed) || 0,
-      puzzle_date: score.puzzleDate
+  try {
+    return await apiRequest('/api/submit-score', {
+      method: 'POST',
+      body: JSON.stringify({
+        gameMode: score.gameMode,
+        difficulty: score.difficulty,
+        won: Boolean(score.won),
+        guessesUsed: Number(score.guessesUsed) || 0,
+        puzzleDate: score.puzzleDate
+      })
+    });
+  } catch (error) {
+    if (error.status === 409 && /already been submitted/i.test(error.message)) {
+      return { saved: true, duplicate: true };
     }
-  });
-  if (error) {
-    const status = error.context && error.context.status;
-    if (status === 409) return { saved: true, duplicate: true };
     throw error;
   }
-  return data || { saved: true };
 }
 
 export function rankFor(points) {
