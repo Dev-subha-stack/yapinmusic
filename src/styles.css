@@ -1233,3 +1233,51 @@ select {
   .public-player-stats { grid-template-columns:minmax(0,1fr); gap:8px; }
   .public-player-stat { grid-template-columns:1fr auto; align-items:center; }
 }
+
+
+/* ===== Player profile modal overlay ===== */
+body.player-profile-open { overflow:hidden; }
+.player-profile-overlay[hidden] { display:none !important; }
+.player-profile-overlay:not([hidden]) {
+  position:fixed; inset:0; z-index:1200; display:flex; align-items:center; justify-content:center;
+  overflow-y:auto; padding:clamp(16px,4vh,42px) 18px;
+  background:rgba(12,9,11,.72); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+  animation:playerOverlayIn .18s ease-out both;
+}
+.public-profile-modal {
+  position:relative; width:min(100%,760px); max-width:760px; max-height:min(88vh,920px);
+  overflow:auto; overscroll-behavior:contain; padding:clamp(17px,3vw,28px);
+  border:1px solid var(--line); border-radius:24px; background:var(--bg);
+  box-shadow:0 28px 100px rgba(0,0,0,.42);
+  animation:playerModalIn .2s cubic-bezier(.2,.8,.2,1) both;
+}
+.public-profile-modal .profile-page-head { align-items:flex-start; padding-right:52px; margin-bottom:18px; }
+.public-profile-modal .profile-page-head h1 { font-size:clamp(1.7rem,4vw,2.5rem); }
+.public-profile-modal .profile-page-head .lede { max-width:510px; }
+.public-profile-close {
+  position:absolute; top:14px; right:14px; z-index:5; display:grid; place-items:center;
+  width:42px; height:42px; border:1px solid var(--line); border-radius:50%;
+  background:var(--surface); color:var(--fg); text-decoration:none;
+  font:500 1.8rem/1 var(--f-body); box-shadow:var(--shadow); transition:background .15s,border-color .15s,transform .15s;
+}
+.public-profile-close:hover { border-color:var(--accent); background:var(--hover); transform:rotate(90deg); }
+.public-profile-close:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.public-profile-modal .public-profile-panel { border-radius:18px; }
+@keyframes playerOverlayIn { from { opacity:0; } to { opacity:1; } }
+@keyframes playerModalIn { from { opacity:0; transform:translateY(14px) scale(.985); } to { opacity:1; transform:translateY(0) scale(1); } }
+@media (max-width:600px) {
+  .player-profile-overlay:not([hidden]) {
+    align-items:stretch; padding:0; background:var(--bg); backdrop-filter:none; -webkit-backdrop-filter:none;
+  }
+  .public-profile-modal {
+    width:100%; max-width:none; max-height:none; height:100%; border:0; border-radius:0;
+    padding:max(17px,env(safe-area-inset-top)) 15px max(20px,env(safe-area-inset-bottom));
+    box-shadow:none;
+  }
+  .public-profile-modal .profile-page-head { padding-right:48px; }
+  .public-profile-modal .profile-page-head .lede { font-size:.9rem; }
+  .public-profile-close { top:max(12px,env(safe-area-inset-top)); right:12px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .player-profile-overlay:not([hidden]), .public-profile-modal { animation:none; }
+}
