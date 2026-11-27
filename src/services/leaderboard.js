@@ -172,19 +172,17 @@ export async function signIn({ email, password }) {
   return currentUser;
 }
 
-export async function saveProfileDetails({ username, bio = '', avatarUrl = null, bannerUrl = null }) {
+export async function saveProfileDetails({ username, bio = '', avatarData = null, bannerData = null }) {
   if (!authClient || !currentSession) throw new Error('Sign in before editing your player profile.');
   const cleanUsername = validateUsername(username);
   const cleanBio = String(bio || '').trim();
   if (cleanBio.length > 160) throw new Error('Your bio must be 160 characters or fewer.');
+  const payload = { username: cleanUsername, bio: cleanBio };
+  if (avatarData) payload.avatarData = avatarData;
+  if (bannerData) payload.bannerData = bannerData;
   const result = await apiRequest('/api/profile', {
     method: 'POST',
-    body: JSON.stringify({
-      username: cleanUsername,
-      bio: cleanBio,
-      avatarUrl: avatarUrl || null,
-      bannerUrl: bannerUrl || null
-    })
+    body: JSON.stringify(payload)
   });
   currentProfile = result.profile || null;
   accountError = null;
@@ -195,9 +193,7 @@ export async function saveProfileDetails({ username, bio = '', avatarUrl = null,
 export async function saveUsername(value) {
   return saveProfileDetails({
     username: value,
-    bio: currentProfile ? currentProfile.bio || '' : '',
-    avatarUrl: currentProfile ? currentProfile.avatar_url || null : null,
-    bannerUrl: currentProfile ? currentProfile.banner_url || null : null
+    bio: currentProfile ? currentProfile.bio || '' : ''
   });
 }
 
