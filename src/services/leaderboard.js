@@ -172,17 +172,33 @@ export async function signIn({ email, password }) {
   return currentUser;
 }
 
-export async function saveUsername(value) {
-  if (!authClient || !currentSession) throw new Error('Sign in before choosing a leaderboard name.');
-  const username = validateUsername(value);
+export async function saveProfileDetails({ username, bio = '', avatarUrl = null, bannerUrl = null }) {
+  if (!authClient || !currentSession) throw new Error('Sign in before editing your player profile.');
+  const cleanUsername = validateUsername(username);
+  const cleanBio = String(bio || '').trim();
+  if (cleanBio.length > 160) throw new Error('Your bio must be 160 characters or fewer.');
   const result = await apiRequest('/api/profile', {
     method: 'POST',
-    body: JSON.stringify({ username })
+    body: JSON.stringify({
+      username: cleanUsername,
+      bio: cleanBio,
+      avatarUrl: avatarUrl || null,
+      bannerUrl: bannerUrl || null
+    })
   });
   currentProfile = result.profile || null;
   accountError = null;
   notifyAccount();
   return currentProfile;
+}
+
+export async function saveUsername(value) {
+  return saveProfileDetails({
+    username: value,
+    bio: currentProfile ? currentProfile.bio || '' : '',
+    avatarUrl: currentProfile ? currentProfile.avatar_url || null : null,
+    bannerUrl: currentProfile ? currentProfile.banner_url || null : null
+  });
 }
 
 export async function signOut() {
