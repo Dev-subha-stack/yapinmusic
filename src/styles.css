@@ -1953,3 +1953,56 @@ body.player-profile-open { overflow:hidden; }
   .nav-menu-arrow,
   .nav-menu-panel { animation: none !important; transition: none !important; }
 }
+
+
+/* Navigation menu link specificity and mobile viewport alignment */
+.site-head nav#main-navigation .nav-menu-home,
+.site-head nav#main-navigation .nav-submenu > a {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--fg);
+  font: 650 .91rem var(--f-body);
+  line-height: 1.25;
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.site-head nav#main-navigation .nav-menu-home:hover,
+.site-head nav#main-navigation .nav-submenu > a:hover {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+  background: var(--hover);
+  color: var(--fg);
+}
+.site-head nav#main-navigation .nav-menu-home[aria-current="page"],
+.site-head nav#main-navigation .nav-submenu > a[aria-current="page"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--fg);
+}
+@media (max-width: 700px) {
+  .nav-menu-panel {
+    left: 50%;
+    right: auto;
+    width: min(88vw, 350px);
+    animation: navMenuMobileIn .16s ease-out both;
+  }
+  @keyframes navMenuMobileIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-5px) scale(.985); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-menu-mobile,
+  .nav-menu-panel,
+  .nav-menu-chevron,
+  .nav-menu-icon span,
+  .nav-menu-arrow { animation: none !important; transition: none !important; }
+}
