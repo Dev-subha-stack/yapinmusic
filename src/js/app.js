@@ -2248,7 +2248,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     mobileNav.addEventListener('pointerout', function (event) {
       if (!navCanHover()) return;
       var group = event.target.closest('[data-menu-group]');
-      if (group && !group.contains(event.relatedTarget)) closeMenuGroup(group);
+      while (group && mobileNav.contains(group)) {
+        if (!group.contains(event.relatedTarget)) closeMenuGroup(group);
+        group = group.parentElement && group.parentElement.closest('[data-menu-group]');
+      }
     });
 
     mobileNav.addEventListener('focusout', function (event) {
