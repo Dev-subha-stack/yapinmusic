@@ -1856,12 +1856,200 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     };
   }
 
+  function createTasksUI() {
+    var root = document.getElementById('v-tasks');
+    var accountState = getAccountState();
+    var initialized = false;
+    var loading = false;
+    var snapshot = null;
+    var errorMessage = '';
+
+    function appendNotice(parent, message, actionLabel, href) {
+      var panel = el('section', 'tasks-notice');
+      panel.appendChild(el('p', null, message));
+      if (actionLabel && href) {
+        var link = el('a', 'btn primary', actionLabel);
+        link.href = href;
+        panel.appendChild(link);
+      }
+      parent.appendChild(panel);
+    }
+
+    function claim(type, missionId, button) {
+      if (button.disabled) return;
+      button.disabled = true;
+      var oldLabel = button.textContent;
+      button.textContent = 'Claiming…';
+      claimDailyReward({ type: type, missionId: missionId }).then(async function (result) {
+        toast('+' + result.points + ' points added!');
+        snapshot = result.tasks || null;
+        errorMessage = '';
+        try { await getPlayerLeaderboardEntry(); } catch (profileError) {
+          console.warn('Could not refresh the player profile after a reward claim.', profileError);
+        }
+        if (leaderboardUI) leaderboardUI.refresh();
+        await refresh();
+      }).catch(function (error) {
+        toast(error.message || 'Could not claim this reward.');
+        button.disabled = false;
+        button.textContent = oldLabel;
+      });
+    }
+
+    function render() {
+      if (!root) return;
+      root.innerHTML = '';
+      var page = el('div', 'tasks-page');
+      var head = el('div', 'tasks-page-head');
+      var headCopy = el('div');
+      headCopy.appendChild(el('p', 'lb-eyebrow', 'PLAY DAILY · EARN POINTS'));
+      headCopy.appendChild(el('h1', null, 'Daily Tasks'));
+      headCopy.appendChild(el('p', 'lede', 'Complete music missions and collect your free daily points. Every reward adds to your leaderboard total.'));
+      head.appendChild(headCopy);
+      var refreshButton = el('button', 'btn', 'Refresh tasks');
+      refreshButton.type = 'button';
+      refreshButton.disabled = loading;
+      refreshButton.addEventListener('click', refresh);
+      head.appendChild(refreshButton);
+      page.appendChild(head);
+
+      if (!accountState.configured) {
+        appendNotice(page, 'Player accounts are not connected yet. Daily tasks and points need a signed-in account.', 'Open profile', '#profile');
+      } else if (accountState.loading) {
+        appendNotice(page, 'Checking your player account…');
+      } else if (!accountState.user) {
+        appendNotice(page, 'Sign in or create a free Yapin account to collect daily points and save your mission progress.', 'Sign in / create account', '#profile');
+      } else if (!accountState.profile) {
+        appendNotice(page, 'Set up your public player name before earning points on the leaderboard.', 'Set up profile', '#profile');
+      } else if (loading && !snapshot) {
+        appendNotice(page, 'Loading today’s missions…');
+      } else if (errorMessage && !snapshot) {
+        var errorPanel = el('section', 'tasks-notice');
+        errorPanel.appendChild(el('p', null, errorMessage));
+        var retry = el('button', 'btn primary', 'Try again');
+        retry.type = 'button';
+        retry.addEventListener('click', refresh);
+        errorPanel.appendChild(retry);
+        page.appendChild(errorPanel);
+      } else if (snapshot) {
+        var summary = el('div', 'tasks-summary');
+        var balance = el('div', 'tasks-balance');
+        balance.appendChild(el('span', null, 'YOUR POINTS'));
+        balance.appendChild(el('strong', null, String(snapshot.totalPoints || 0)));
+        balance.appendChild(el('small', null, 'Leaderboard total'));
+        summary.appendChild(balance);
+        var date = el('div', 'tasks-date');
+        date.appendChild(el('span', null, 'TODAY’S RESET'));
+        date.appendChild(el('strong', null, snapshot.date || 'Today'));
+        date.appendChild(el('small', null, 'Daily rewards reset at midnight India time'));
+        summary.appendChild(date);
+        page.appendChild(summary);
+
+        var bonus = el('section', 'task-free-card');
+        var bonusCopy = el('div', 'task-free-copy');
+        bonusCopy.appendChild(el('span', 'task-kicker', 'DAILY FREE POINTS'));
+        bonusCopy.appendChild(el('h2', null, 'Your daily 25-point drop'));
+        bonusCopy.appendChild(el('p', null, 'Collect a free reward once every day. No game required.'));
+        bonus.appendChild(bonusCopy);
+        var bonusAction = el('div', 'task-free-action');
+        bonusAction.appendChild(el('strong', null, '+' + (snapshot.dailyBonus ? snapshot.dailyBonus.points : 25) + ' pts'));
+        var bonusButton = el('button', snapshot.dailyBonus && snapshot.dailyBonus.claimed ? 'btn' : 'btn primary',
+          snapshot.dailyBonus && snapshot.dailyBonus.claimed ? 'Collected today' : 'Claim free points');
+        bonusButton.type = 'button';
+        bonusButton.disabled = loading || Boolean(snapshot.dailyBonus && snapshot.dailyBonus.claimed);
+        bonusButton.addEventListener('click', function () { claim('daily_bonus', null, bonusButton); });
+        bonusAction.appendChild(bonusButton);
+        bonus.appendChild(bonusAction);
+        page.appendChild(bonus);
+
+        page.appendChild(el('div', 'tasks-section-title', 'TODAY’S MISSIONS'));
+        var grid = el('div', 'tasks-grid');
+        (snapshot.missions || []).forEach(function (mission) {
+          var card = el('article', 'task-card' + (mission.claimed ? ' is-claimed' : (mission.completed ? ' is-ready' : '')));
+          var top = el('div', 'task-card-top');
+          top.appendChild(el('span', 'task-status', mission.claimed ? 'CLAIMED' : (mission.completed ? 'READY TO CLAIM' : 'IN PROGRESS')));
+          top.appendChild(el('strong', 'task-reward', '+' + mission.reward + ' pts'));
+          card.appendChild(top);
+          card.appendChild(el('h3', null, mission.title));
+          card.appendChild(el('p', 'task-description', mission.description));
+          var progress = el('div', 'task-progress');
+          var track = el('div', 'task-progress-track');
+          var fill = el('span');
+          fill.style.width = Math.max(0, Math.min(100, (Number(mission.current) / Math.max(1, Number(mission.target))) * 100)) + '%';
+          track.appendChild(fill);
+          progress.appendChild(track);
+          progress.appendChild(el('small', null, mission.current + ' / ' + mission.target + ' complete'));
+          card.appendChild(progress);
+          var action;
+          if (mission.claimed) {
+            action = el('button', 'btn', 'Reward collected');
+            action.disabled = true;
+          } else if (mission.completed) {
+            action = el('button', 'btn primary', 'Claim +' + mission.reward + ' points');
+            action.addEventListener('click', function () { claim('mission', mission.id, action); });
+          } else {
+            action = el('a', 'btn', 'Play a Daily game');
+            action.href = '#song';
+          }
+          action.classList.add('task-card-action');
+          card.appendChild(action);
+          grid.appendChild(card);
+        });
+        page.appendChild(grid);
+        page.appendChild(el('p', 'tasks-footnote', 'Daily game missions count finished Daily rounds only. Random practice rounds do not count. Each reward can be claimed once per day.'));
+        if (errorMessage) page.appendChild(el('p', 'lb-message', errorMessage));
+      }
+      root.appendChild(page);
+    }
+
+    async function refresh() {
+      if (!root || loading) return;
+      if (!accountState.user || !accountState.profile || !isLeaderboardConfigured()) {
+        snapshot = null;
+        render();
+        return;
+      }
+      loading = true;
+      errorMessage = '';
+      render();
+      try {
+        snapshot = await getDailyTasks();
+      } catch (error) {
+        errorMessage = error.message || 'Could not load daily missions.';
+      } finally {
+        loading = false;
+        render();
+      }
+    }
+
+    return {
+      init: function () {
+        if (!initialized) {
+          initialized = true;
+          subscribeAccount(function (state) {
+            accountState = state;
+            if (!state.user || !state.profile) {
+              snapshot = null;
+              render();
+            } else if (!state.loading) {
+              refresh();
+            }
+          });
+        }
+        render();
+        refresh();
+      },
+      refresh: refresh
+    };
+  }
+
   var leaderboardUI = createLeaderboardUI();
+  var tasksUI = createTasksUI();
   var profileUI = leaderboardUI;
 
   /* ============ ROUTES ============ */
 
-  var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'profile', 'our-team'];
+  var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'tasks', 'profile', 'our-team'];
   function route() {
     var h = location.hash.replace('#', '');
     if (VIEWS.indexOf(h) < 0) h = 'home';
@@ -1873,6 +2061,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     active = games[h] || null;
     if (active) active.init();
     if ((h === 'leaderboard' || h === 'profile') && leaderboardUI) leaderboardUI.init();
+    if (h === 'tasks' && tasksUI) tasksUI.init();
     if (queuedRandomGame === h && active && active.random) {
       active.random();
       queuedRandomGame = null;
