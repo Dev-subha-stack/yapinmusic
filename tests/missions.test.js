@@ -24,3 +24,14 @@ test('claimed mission ids remain marked as claimed', () => {
   const missions = getDailyMissionStatus({ gamesPlayed: 1, wins: 0, gameModes: ['song'] }, ['play_daily']);
   assert.equal(missions[0].claimed, true);
 });
+
+test('Random rounds advance daily mission progress too', () => {
+  const missions = getDailyMissionStatus({
+    gamesPlayed: 3,
+    wins: 2,
+    gameModes: ['song', 'band']
+  });
+  assert.equal(missions[0].completed, true);
+  assert.equal(missions[1].completed, true);
+  assert.equal(missions[2].completed, true);
+});
