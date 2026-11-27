@@ -266,7 +266,21 @@ export async function getPlayerLeaderboardEntry() {
   if (!authClient || !currentSession) return null;
   const result = await apiRequest('/api/profile', { method: 'GET' });
   currentProfile = result.profile || null;
+  notifyAccount();
   return currentProfile;
+}
+
+export async function getDailyTasks() {
+  if (!authClient || !currentSession) throw new Error('Sign in to view daily tasks.');
+  return apiRequest('/api/tasks', { method: 'GET' });
+}
+
+export async function claimDailyReward({ type, missionId = null } = {}) {
+  if (!authClient || !currentSession) throw new Error('Sign in to collect daily points.');
+  return apiRequest('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ type, missionId })
+  });
 }
 
 export async function submitScore(score) {
