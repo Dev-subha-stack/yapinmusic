@@ -262,6 +262,19 @@ export async function getLeaderboard(options = {}) {
   return { configured: true, entries: body.entries || [] };
 }
 
+export async function getPublicProfile(userId) {
+  const cleanUserId = String(userId || '').trim();
+  if (!cleanUserId || cleanUserId.length > 128) {
+    throw new Error('This player profile link is invalid.');
+  }
+  const result = await apiRequest(
+    '/api/public-profile?userId=' + encodeURIComponent(cleanUserId),
+    { method: 'GET' },
+    false
+  );
+  return result.profile || null;
+}
+
 export async function getPlayerLeaderboardEntry() {
   if (!authClient || !currentSession) return null;
   const result = await apiRequest('/api/profile', { method: 'GET' });
