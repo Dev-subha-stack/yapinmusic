@@ -914,3 +914,55 @@ select {
   .lb-score { grid-column:3; grid-row:1 / span 2; }
   .lb-points-key span { flex:1 1 100%; justify-content:space-between; }
 }
+
+
+/* ===== Desktop header: brand | centred navigation | theme ===== */
+@media (min-width: 701px) {
+  .site-head .wrap.top {
+    width: min(100%, 1600px);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px 18px;
+    padding-block: 10px;
+  }
+  .site-head .brand {
+    min-width: max-content;
+    font-size: clamp(1.12rem, 1.45vw, 1.4rem);
+  }
+  .site-head nav {
+    min-width: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(2px, .35vw, 7px);
+  }
+  .site-head nav a {
+    flex: 0 1 auto;
+    padding: 9px clamp(8px, .85vw, 15px);
+    white-space: nowrap;
+    font-size: clamp(.82rem, .92vw, .98rem);
+  }
+  .site-head .theme-toggle {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    margin: 0;
+  }
+}
+@media (min-width: 701px) and (max-width: 1120px) {
+  .site-head .wrap.top {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .site-head nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .site-head .theme-toggle {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
