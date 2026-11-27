@@ -1531,9 +1531,13 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       editor.appendChild(el('p', 'profile-char-count', (bioInput.value.length) + '/160 characters'));
 
       var avatarUrlField = field('Profile picture URL (optional)', 'text', 'https://…', 'url');
+      avatarUrlField.input.required = false;
+      avatarUrlField.input.removeAttribute('required');
       avatarUrlField.input.value = profile.avatar_url || '';
       editor.appendChild(avatarUrlField.label);
       var bannerUrlField = field('Banner image URL (optional)', 'text', 'https://…', 'url');
+      bannerUrlField.input.required = false;
+      bannerUrlField.input.removeAttribute('required');
       bannerUrlField.input.value = profile.banner_url || '';
       editor.appendChild(bannerUrlField.label);
 
