@@ -1181,3 +1181,55 @@ select {
   .tasks-grid { grid-template-columns:minmax(0,1fr); }
   .task-description { min-height:0; }
 }
+
+
+/* ===== Public player profiles from the leaderboard ===== */
+.lb-row { grid-template-columns:42px minmax(0,1fr) auto auto; }
+.lb-person-link {
+  display:flex; align-items:center; gap:12px; min-width:0; padding:3px;
+  border-radius:12px; color:inherit; text-decoration:none;
+  transition:background .15s ease;
+}
+.lb-person-link:hover { background:var(--hover); }
+.lb-person-link:hover .lb-identity strong { color:var(--accent); }
+.lb-person-link:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.lb-person-link .lb-identity { min-width:0; }
+.lb-person-link .lb-identity small { line-height:1.4; }
+
+.public-profile-panel { padding:0; overflow:hidden; }
+.public-player-card { overflow:hidden; border:1px solid var(--line); border-radius:19px; background:var(--surface); }
+.public-player-banner {
+  position:relative; height:clamp(150px,24vw,245px); overflow:hidden;
+  background:radial-gradient(ellipse at 82% 8%,rgba(255,128,88,.5),transparent 44%),linear-gradient(125deg,#311B24,#6A3038 55%,#A84931);
+}
+.public-player-banner img { display:block; width:100%; height:100%; object-fit:cover; }
+.public-player-content { padding:0 clamp(16px,3vw,28px) 26px; }
+.public-player-identity { display:flex; align-items:flex-end; gap:17px; min-width:0; margin-top:-48px; position:relative; }
+.public-player-avatar {
+  display:grid; place-items:center; flex:none; width:104px; height:104px; overflow:hidden;
+  border:5px solid var(--surface); border-radius:26px; background:var(--surface-alt);
+  color:var(--accent); font:900 2rem var(--f-display); box-shadow:var(--shadow);
+}
+.public-player-avatar img { display:block; width:100%; height:100%; object-fit:cover; }
+.public-player-name-block { display:grid; gap:6px; min-width:0; padding-bottom:9px; }
+.public-player-name-block h2 { margin:0; color:var(--fg); font:800 clamp(1.2rem,3vw,1.8rem) var(--f-display); overflow-wrap:anywhere; }
+.public-player-rank { color:var(--muted); font-size:.86rem; font-weight:700; }
+.public-player-bio { margin:20px 0 0; color:var(--muted); font-size:.96rem; line-height:1.65; overflow-wrap:anywhere; }
+.public-player-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:22px; }
+.public-player-stat { display:grid; gap:7px; min-width:0; padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:var(--bg); }
+.public-player-stat span { color:var(--muted); font-size:.75rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+.public-player-stat strong { color:var(--fg); font:800 clamp(1.25rem,3vw,1.8rem) var(--f-display); font-variant-numeric:tabular-nums; }
+@media (max-width:420px) {
+  .lb-row { grid-template-columns:34px minmax(0,1fr) auto; gap:8px; padding:10px; }
+  .lb-row .lb-rank-tag { grid-column:2; grid-row:2; }
+  .lb-row .lb-score { grid-column:3; grid-row:1 / span 2; }
+  .lb-person-link { gap:8px; padding:0; }
+  .lb-person-link .lb-row-avatar { width:34px; height:34px; border-radius:11px; }
+  .lb-person-link .lb-identity strong { font-size:.87rem; }
+  .lb-person-link .lb-identity small { font-size:.68rem; }
+  .public-player-identity { gap:11px; margin-top:-40px; }
+  .public-player-avatar { width:82px; height:82px; border-radius:21px; font-size:1.5rem; }
+  .public-player-name-block { padding-bottom:5px; }
+  .public-player-stats { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .public-player-stat { grid-template-columns:1fr auto; align-items:center; }
+}
