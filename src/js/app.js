@@ -2,6 +2,10 @@ import { BANDS } from '../data/music.js';
 import { TEAM } from '../data/team.js';
 import { searchBandInfo, searchSongInfo } from '../services/music-info.js';
 import { storage as ls } from '../services/storage.js';
+import {
+  getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername,
+  getLeaderboard, rankFor, submitScore, isLeaderboardConfigured
+} from '../services/leaderboard.js';
 import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
 (function () {
@@ -208,6 +212,46 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     }
   }
   var day = dayNumber();
+
+  function localPuzzleDate() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function submitDailyLeaderboardScore(gameMode, difficulty, won, guessesUsed) {
+    var account = getAccountState();
+    if (!account.configured || !account.user || !account.profile) return;
+    submitScore({
+      gameMode: gameMode,
+      difficulty: difficulty,
+      won: Boolean(won),
+      guessesUsed: guessesUsed,
+      puzzleDate: localPuzzleDate()
+    }).then(function (result) {
+      if (result && result.saved) {
+        if (!result.duplicate && won) toast('Daily score added · +' + result.points + ' points');
+        if (leaderboardUI) leaderboardUI.refresh();
+      }
+    }).catch(function (error) {
+      console.warn('Leaderboard score was not saved.', error);
+      toast('Your result was saved locally, but the leaderboard could not be updated.');
+    });
+  }
+
+  function addDailyLeaderboardPrompt(resultEl, won) {
+    var account = getAccountState();
+    var note = el('div', 'lb-game-note');
+    var message = account.user && account.profile
+      ? (won ? 'Daily win points are being added to your player card.' : 'This Daily attempt is recorded. A win is worth 100–200 points.')
+      : 'Play as a guest, or sign in if you want your name and rank to appear on the shared leaderboard.';
+    note.appendChild(el('p', null, message));
+    if (!account.user || !account.profile) {
+      var link = el('a', 'btn', 'Open leaderboard');
+      link.href = '#leaderboard';
+      note.appendChild(link);
+    }
+    resultEl.appendChild(note);
+  }
 
   /* ============ DIFFICULTY ============ */
 
@@ -489,7 +533,13 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     }
 
     function finish() {
-      if (S.mode === 'daily' && !S.counted) { statsFinish(sKey(), S.won, day); S.counted = true; save(); statsRender(statsEl, sKey()); }
+      if (S.mode === 'daily' && !S.counted) {
+        statsFinish(sKey(), S.won, day);
+        S.counted = true;
+        save();
+        statsRender(statsEl, sKey());
+        submitDailyLeaderboardScore('song', S.diff, S.won, S.guesses.length);
+      }
       showResult();
     }
 
@@ -506,7 +556,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var ul = el('ul');
       b.s.forEach(function (s) { ul.appendChild(el('li', null, s[0] + ' · ' + s[1])); });
       resultEl.appendChild(ul);
-      if (S.mode === 'daily') resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
+      if (S.mode === 'daily') {
+        resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
+        addDailyLeaderboardPrompt(resultEl, S.won);
+      }
       var acts = el('div', 'acts');
       var copy = el('button', 'btn primary', 'Copy result'); copy.type = 'button';
       var again = el('button', 'btn', 'Play a random one'); again.type = 'button';
@@ -822,7 +875,16 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       else if (spent() >= maxG()) { S.done = true; S.won = false; }
       if (!S.done) toast('Not this band. New hint unlocked!');
       save(); render();
-      if (S.done) { if (S.mode === 'daily' && !S.counted) { statsFinish(sKey(), S.won, day); S.counted = true; save(); statsRender(statsEl, sKey()); } showResult(); }
+      if (S.done) {
+        if (S.mode === 'daily' && !S.counted) {
+          statsFinish(sKey(), S.won, day);
+          S.counted = true;
+          save();
+          statsRender(statsEl, sKey());
+          submitDailyLeaderboardScore('band', S.diff, S.won, S.guesses.length);
+        }
+        showResult();
+      }
       input.focus();
     }
 
@@ -839,7 +901,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       resultEl.appendChild(el('p', 'ans', a.n));
       resultEl.appendChild(el('p', 'sub', '“' + S.song.t + '” · ' + S.song.a + ' · ' + S.song.y));
       resultEl.appendChild(el('p', 'sub', a.g + ' · ' + a.c + ' · formed ' + a.y));
-      if (S.mode === 'daily') resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
+      if (S.mode === 'daily') {
+        resultEl.appendChild(el('p', 'sub', 'Come back tomorrow for a new daily puzzle.'));
+        addDailyLeaderboardPrompt(resultEl, S.won);
+      }
       var acts = el('div', 'acts');
       var copy = el('button', 'btn primary', 'Copy result'); copy.type = 'button';
       var again = el('button', 'btn', 'Play a random one'); again.type = 'button';
@@ -1212,9 +1277,291 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     });
   })();
 
+  /* ============ LEADERBOARD ============ */
+
+  function createLeaderboardUI() {
+    var root = document.getElementById('v-leaderboard');
+    var accountBox = root && $('[data-lb-account]', root);
+    var boardBox = root && $('[data-lb-board]', root);
+    var refreshButton = root && $('[data-lb-refresh]', root);
+    var authMode = 'signup';
+    var accountState = getAccountState();
+    var entries = [];
+    var initialized = false;
+    var unsubscribe = null;
+    var loadingBoard = false;
+
+    function field(labelText, type, placeholder, autocomplete) {
+      var label = el('label', 'lb-field');
+      label.appendChild(el('span', null, labelText));
+      var input = el('input');
+      input.type = type;
+      input.placeholder = placeholder || '';
+      input.autocomplete = autocomplete || 'off';
+      input.required = true;
+      label.appendChild(input);
+      return { label: label, input: input };
+    }
+
+    function setMessage(node, text, isError) {
+      node.textContent = text || '';
+      node.dataset.error = isError ? 'true' : 'false';
+    }
+
+    function renderAccount(nextState) {
+      accountState = nextState || getAccountState();
+      if (!accountBox) return;
+      accountBox.innerHTML = '';
+
+      if (!accountState.configured) {
+        accountBox.appendChild(el('p', 'lb-muted', 'The shared account service is not connected yet. You can still play every game as a guest. Once the site backend is connected, sign-in here will let you publish your player name and rank.'));
+        accountBox.appendChild(el('div', 'lb-setup-note', 'Leaderboard setup is waiting for a dedicated YapinMusic Supabase project and the site environment keys.'));
+        return;
+      }
+
+      if (accountState.loading) {
+        accountBox.appendChild(el('p', 'lb-muted', 'Checking your player account…'));
+        return;
+      }
+
+      if (accountState.user) {
+        if (!accountState.profile) {
+          accountBox.appendChild(el('p', 'lb-muted', 'Choose the public name other players will see. Your email address stays private.'));
+          var nameForm = el('form', 'lb-name-form');
+          var nameField = field('Public player name', 'text', 'e.g. MusicNerd42', 'nickname');
+          nameForm.appendChild(nameField.label);
+          var nameMessage = el('p', 'lb-message');
+          nameForm.appendChild(nameMessage);
+          var saveName = el('button', 'btn primary', 'Save player name');
+          saveName.type = 'submit';
+          nameForm.appendChild(saveName);
+          nameForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            saveName.disabled = true;
+            setMessage(nameMessage, 'Saving your public name…', false);
+            try {
+              await saveUsername(nameField.input.value);
+              toast('Your leaderboard name is ready.');
+              await refresh();
+            } catch (error) {
+              setMessage(nameMessage, error.message || 'Could not save that name.', true);
+            } finally {
+              saveName.disabled = false;
+            }
+          });
+          accountBox.appendChild(nameForm);
+          return;
+        }
+
+        var row = entries.find(function (item) { return item.user_id === accountState.user.id; });
+        var points = row ? Number(row.total_points) || 0 : 0;
+        var rank = rankFor(points);
+        var summary = el('div', 'lb-account-summary');
+        var playerLine = el('div', 'lb-player-line');
+        var avatar = el('div', 'lb-player-avatar', accountState.profile.username.trim().charAt(0).toUpperCase() || 'Y');
+        playerLine.appendChild(avatar);
+        var identity = el('div', 'lb-identity');
+        identity.appendChild(el('div', 'lb-player-name', accountState.profile.username));
+        identity.appendChild(el('div', 'lb-player-email', accountState.user.email || 'Signed-in player'));
+        playerLine.appendChild(identity);
+        summary.appendChild(playerLine);
+
+        var rankCard = el('div', 'lb-rank-card');
+        var rankLine = el('div', 'lb-rank-line');
+        rankLine.appendChild(el('span', 'lb-rank-label', rank.name));
+        rankLine.appendChild(el('span', 'lb-rank-points', points + ' points'));
+        rankCard.appendChild(rankLine);
+        var track = el('div', 'lb-progress-track');
+        var fill = el('span');
+        fill.style.width = rank.progress + '%';
+        track.appendChild(fill);
+        rankCard.appendChild(track);
+        rankCard.appendChild(el('p', 'lb-muted', rank.nextName ? (rank.next - points) + ' more points to ' + rank.nextName + '.' : 'You have reached the highest rank.'));
+        summary.appendChild(rankCard);
+
+        if (row) summary.appendChild(el('p', 'lb-muted', 'Global position #' + row.rank_position + ' · ' + row.wins + ' daily wins.'));
+        else summary.appendChild(el('p', 'lb-muted', 'Finish a Daily puzzle to earn your first rank points.'));
+
+        var renameForm = el('form', 'lb-name-form');
+        var renameField = field('Change public name', 'text', accountState.profile.username, 'nickname');
+        renameField.input.value = accountState.profile.username;
+        renameForm.appendChild(renameField.label);
+        var renameMessage = el('p', 'lb-message');
+        renameForm.appendChild(renameMessage);
+        var renameButton = el('button', 'btn', 'Update name');
+        renameButton.type = 'submit';
+        renameForm.appendChild(renameButton);
+        renameForm.addEventListener('submit', async function (event) {
+          event.preventDefault();
+          renameButton.disabled = true;
+          try {
+            await saveUsername(renameField.input.value);
+            setMessage(renameMessage, 'Your public name was updated.', false);
+            await refresh();
+          } catch (error) {
+            setMessage(renameMessage, error.message || 'Could not update that name.', true);
+          } finally {
+            renameButton.disabled = false;
+          }
+        });
+        summary.appendChild(renameForm);
+
+        var actions = el('div', 'lb-account-actions');
+        var logout = el('button', 'btn', 'Sign out');
+        logout.type = 'button';
+        logout.addEventListener('click', async function () {
+          logout.disabled = true;
+          try { await signOut(); toast('Signed out. You can keep playing as a guest.'); }
+          catch (error) { toast(error.message || 'Could not sign out.'); }
+          finally { logout.disabled = false; }
+        });
+        actions.appendChild(logout);
+        summary.appendChild(actions);
+        accountBox.appendChild(summary);
+        return;
+      }
+
+      accountBox.appendChild(el('p', 'lb-muted', 'You never need an account to play. Create one only to show a public player name in the rankings.'));
+      var switcher = el('div', 'lb-auth-switch');
+      var createButton = el('button', 'btn', 'Create account');
+      createButton.type = 'button';
+      createButton.setAttribute('aria-pressed', String(authMode === 'signup'));
+      var loginButton = el('button', 'btn', 'Log in');
+      loginButton.type = 'button';
+      loginButton.setAttribute('aria-pressed', String(authMode === 'login'));
+      createButton.addEventListener('click', function () { authMode = 'signup'; renderAccount(accountState); });
+      loginButton.addEventListener('click', function () { authMode = 'login'; renderAccount(accountState); });
+      switcher.appendChild(createButton);
+      switcher.appendChild(loginButton);
+      accountBox.appendChild(switcher);
+
+      var authForm = el('form', 'lb-auth-form');
+      var usernameField = field('Public player name', 'text', 'e.g. MusicNerd42', 'nickname');
+      if (authMode === 'signup') authForm.appendChild(usernameField.label);
+      var emailField = field('Email address', 'email', 'you@example.com', 'email');
+      authForm.appendChild(emailField.label);
+      var passwordField = field('Password', 'password', 'At least 6 characters', authMode === 'signup' ? 'new-password' : 'current-password');
+      passwordField.input.minLength = 6;
+      authForm.appendChild(passwordField.label);
+      var authMessage = el('p', 'lb-message');
+      authForm.appendChild(authMessage);
+      var authSubmit = el('button', 'btn primary', authMode === 'signup' ? 'Create free account' : 'Log in');
+      authSubmit.type = 'submit';
+      authForm.appendChild(authSubmit);
+      authForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        authSubmit.disabled = true;
+        setMessage(authMessage, authMode === 'signup' ? 'Creating your account…' : 'Signing you in…', false);
+        try {
+          if (authMode === 'signup') {
+            var result = await signUp({
+              username: usernameField.input.value,
+              email: emailField.input.value,
+              password: passwordField.input.value
+            });
+            if (result.confirmationPending) {
+              setMessage(authMessage, 'Check your email for the confirmation link, then come back and log in.', false);
+            } else {
+              setMessage(authMessage, 'Account created. Your player name is ready.', false);
+              toast('Welcome to the leaderboard!');
+              await refresh();
+            }
+          } else {
+            await signIn({ email: emailField.input.value, password: passwordField.input.value });
+            setMessage(authMessage, 'You are signed in.', false);
+            toast('Welcome back!');
+            await refresh();
+          }
+        } catch (error) {
+          setMessage(authMessage, error.message || 'Could not complete that request.', true);
+        } finally {
+          authSubmit.disabled = false;
+        }
+      });
+      accountBox.appendChild(authForm);
+    }
+
+    function renderBoard() {
+      if (!boardBox) return;
+      boardBox.innerHTML = '';
+      if (!accountState.configured) {
+        boardBox.appendChild(el('div', 'lb-empty', 'The global leaderboard will appear here after the YapinMusic database is connected.'));
+        return;
+      }
+      if (!entries.length) {
+        boardBox.appendChild(el('div', 'lb-empty', 'No ranked players yet. Win a Daily round while signed in to claim the first spot.'));
+        return;
+      }
+      var list = el('div', 'lb-rows');
+      entries.forEach(function (entry, index) {
+        var position = Number(entry.rank_position) || (index + 1);
+        var rank = rankFor(entry.total_points);
+        var item = el('div', 'lb-row' + (position === 1 ? ' lb-first' : ''));
+        var place = el('div', 'lb-place', '#' + position);
+        item.appendChild(place);
+        var identity = el('div', 'lb-identity');
+        identity.appendChild(el('strong', null, entry.username));
+        identity.appendChild(el('small', null, (Number(entry.wins) || 0) + ' wins · ' + (Number(entry.games_played) || 0) + ' daily games'));
+        item.appendChild(identity);
+        item.appendChild(el('span', 'lb-rank-tag', rank.name));
+        var score = el('div', 'lb-score');
+        score.appendChild(el('strong', null, String(Number(entry.total_points) || 0)));
+        score.appendChild(el('small', null, 'points'));
+        item.appendChild(score);
+        list.appendChild(item);
+      });
+      boardBox.appendChild(list);
+    }
+
+    async function refresh() {
+      if (!boardBox || loadingBoard) return;
+      if (!isLeaderboardConfigured()) {
+        entries = [];
+        renderBoard();
+        renderAccount(accountState);
+        return;
+      }
+      loadingBoard = true;
+      if (refreshButton) refreshButton.disabled = true;
+      boardBox.classList.add('lb-refreshing');
+      try {
+        var result = await getLeaderboard({ limit: 100 });
+        entries = result.entries || [];
+        renderBoard();
+        renderAccount(accountState);
+      } catch (error) {
+        boardBox.innerHTML = '';
+        boardBox.appendChild(el('div', 'lb-empty', 'The leaderboard could not load yet. Check the database setup and try refreshing.'));
+        console.warn('Leaderboard could not be loaded.', error);
+      } finally {
+        loadingBoard = false;
+        boardBox.classList.remove('lb-refreshing');
+        if (refreshButton) refreshButton.disabled = false;
+      }
+    }
+
+    if (refreshButton) refreshButton.addEventListener('click', refresh);
+
+    return {
+      init: function () {
+        if (!initialized) {
+          initialized = true;
+          unsubscribe = subscribeAccount(function (state) {
+            accountState = state;
+            renderAccount(state);
+          });
+        }
+        refresh();
+      },
+      refresh: refresh
+    };
+  }
+
+  var leaderboardUI = createLeaderboardUI();
+
   /* ============ ROUTES ============ */
 
-  var VIEWS = ['home', 'song', 'band', 'explore', 'our-team'];
+  var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'our-team'];
   function route() {
     var h = location.hash.replace('#', '');
     if (VIEWS.indexOf(h) < 0) h = 'home';
@@ -1225,6 +1572,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     document.getElementById('band').toggleAttribute('data-home', h === 'home');
     active = games[h] || null;
     if (active) active.init();
+    if (h === 'leaderboard' && leaderboardUI) leaderboardUI.init();
     if (queuedRandomGame === h && active && active.random) {
       active.random();
       queuedRandomGame = null;
