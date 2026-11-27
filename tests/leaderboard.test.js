@@ -4,7 +4,8 @@ import {
   configureLeaderboardAdapter,
   getLeaderboard,
   isLeaderboardConfigured,
-  submitScore
+  submitScore,
+  rankFor
 } from '../src/services/leaderboard.js';
 
 test('reports an inactive backend without breaking local play', async () => {
@@ -39,4 +40,16 @@ test('delegates reads and score submissions to a configured adapter', async () =
   assert.deepEqual(await submitScore(score), { saved: true });
   assert.deepEqual(calls, [['read', options], ['write', score]]);
   assert.equal(isLeaderboardConfigured(), true);
+});
+
+test('maps leaderboard points to the expected rank tiers', () => {
+  assert.equal(rankFor(0).name, 'Rookie Listener');
+  assert.equal(rankFor(299).name, 'Rookie Listener');
+  assert.equal(rankFor(300).name, 'Bronze Listener');
+  assert.equal(rankFor(750).name, 'Silver Listener');
+  assert.equal(rankFor(1500).name, 'Gold Listener');
+  assert.equal(rankFor(2500).name, 'Platinum Listener');
+  assert.equal(rankFor(4000).name, 'Diamond Listener');
+  assert.equal(rankFor(6000).name, 'Legend');
+  assert.equal(rankFor(6000).progress, 100);
 });
