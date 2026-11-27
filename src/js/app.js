@@ -1547,7 +1547,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       editor.appendChild(bioLabel);
       editor.appendChild(el('p', 'profile-char-count', (bioInput.value.length) + '/160 characters'));
 
-      var avatarUrlField = field('Profile picture URL (optional)', 'url', 'https://…', 'url');
+      var avatarUrlField = field('Profile picture URL (optional)', 'text', 'https://…', 'url');
       avatarUrlField.input.value = profile.avatar_url || '';
       editor.appendChild(avatarUrlField.label);
       var avatarFileField = field('Or upload a profile picture', 'file', '', 'off');
@@ -1555,7 +1555,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       avatarFileField.input.required = false;
       editor.appendChild(avatarFileField.label);
 
-      var bannerUrlField = field('Banner image URL (optional)', 'url', 'https://…', 'url');
+      var bannerUrlField = field('Banner image URL (optional)', 'text', 'https://…', 'url');
       bannerUrlField.input.value = profile.banner_url || '';
       editor.appendChild(bannerUrlField.label);
       var bannerFileField = field('Or upload a banner', 'file', '', 'off');
