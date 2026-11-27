@@ -1115,3 +1115,20 @@ select {
   .profile-preview-avatar { width:76px; height:76px; }
   .profile-preview-identity { margin-top:-34px; }
 }
+
+/* Native file inputs sit directly over the photo controls so the browser always
+   receives a genuine user click (no hidden input .click() indirection). */
+.profile-image-edit { position:absolute; overflow:hidden; }
+.profile-image-edit .profile-file-input {
+  position:absolute; inset:0; z-index:4; width:100%; height:100%;
+  margin:0; padding:0; opacity:0; cursor:pointer; font-size:0;
+}
+.profile-image-edit:focus-within { outline:3px solid var(--accent); outline-offset:3px; }
+.profile-preview-avatar { overflow:visible; }
+.profile-preview-avatar > img {
+  position:absolute; inset:0; width:100%; height:100%;
+  border-radius:20px; object-fit:cover;
+}
+.profile-preview-avatar > span { position:relative; z-index:0; }
+.profile-avatar-edit { z-index:5; }
+.profile-banner-edit { z-index:5; }
