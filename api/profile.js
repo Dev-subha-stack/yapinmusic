@@ -12,7 +12,7 @@ function validBio(value) {
   return bio;
 }
 
-function validImage(value, maxLength) {
+function validImageData(value, maxLength) {
   if (value == null || value === '') return null;
   const image = String(value).trim();
   if (image.length > maxLength) return null;
@@ -62,11 +62,13 @@ export default async function handler(req, res) {
       });
     }
     const bio = validBio(body.bio);
-    const avatarUrl = validImage(body.avatarUrl, 950000);
-    const bannerUrl = validImage(body.bannerUrl, 1850000);
+    const hasAvatar = Object.prototype.hasOwnProperty.call(body, 'avatarData');
+    const hasBanner = Object.prototype.hasOwnProperty.call(body, 'bannerData');
+    const avatarData = hasAvatar ? validImageData(body.avatarData, 950000) : null;
+    const bannerData = hasBanner ? validImageData(body.bannerData, 1850000) : null;
     if (bio == null) return res.status(400).json({ error: 'Your bio must be 160 characters or fewer.' });
-    if (body.avatarUrl && !avatarUrl) return res.status(400).json({ error: 'Use a secure image URL or upload a PNG, JPG or WebP image smaller than 700 KB after compression.' });
-    if (body.bannerUrl && !bannerUrl) return res.status(400).json({ error: 'Use a secure image URL or upload a PNG, JPG or WebP banner smaller than 1.3 MB after compression.' });
+    if (hasAvatar && body.avatarData && !avatarData) return res.status(400).json({ error: 'The profile photo could not be processed. Choose a JPG, PNG, WebP or GIF image and try again.' });
+    if (hasBanner && body.bannerData && !bannerData) return res.status(400).json({ error: 'The banner could not be processed. Choose a JPG, PNG, WebP or GIF image and try again.' });
 
     await pool.query(
       `insert into public.player_profiles (user_id, username, bio, avatar_url, banner_url)
@@ -74,10 +76,10 @@ export default async function handler(req, res) {
        on conflict (user_id) do update
          set username = excluded.username,
              bio = excluded.bio,
-             avatar_url = excluded.avatar_url,
-             banner_url = excluded.banner_url,
+             avatar_url = coalesce(excluded.avatar_url, public.player_profiles.avatar_url),
+             banner_url = coalesce(excluded.banner_url, public.player_profiles.banner_url),
              updated_at = now()`,
-      [userId, username, bio, avatarUrl, bannerUrl]
+      [userId, username, bio, avatarData, bannerData]
     );
     return res.status(200).json({ profile: await readProfile(pool, userId) });
   } catch (error) {
