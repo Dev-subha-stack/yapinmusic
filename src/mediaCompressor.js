@@ -11,6 +11,33 @@ function report(onProgress, phase, progress, message, extra = {}) {
   onProgress?.({ phase, progress: Math.max(0, Math.min(100, progress)), message, ...extra });
 }
 
+
+export function isAnimatedImageBytes(type, bytes) {
+  const mime = String(type || '').toLowerCase().split(';')[0];
+  if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes || []);
+  if (mime === 'image/gif') return bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46;
+  const hasChunk = (chunk) => {
+    for (let i = 0; i <= bytes.length - chunk.length; i += 1) {
+      let match = true;
+      for (let j = 0; j < chunk.length; j += 1) {
+        if (bytes[i + j] !== chunk.charCodeAt(j)) { match = false; break; }
+      }
+      if (match) return true;
+    }
+    return false;
+  };
+  if (mime === 'image/png' || mime === 'image/apng') return hasChunk('acTL');
+  if (mime === 'image/webp') return hasChunk('ANIM') || hasChunk('ANMF');
+  return false;
+}
+
+async function fileHasAnimation(file) {
+  const mime = String(file && file.type || '').toLowerCase().split(';')[0];
+  if (mime === 'image/gif') return true;
+  if (!['image/png', 'image/apng', 'image/webp'].includes(mime) || typeof file.arrayBuffer !== 'function') return false;
+  return isAnimatedImageBytes(mime, new Uint8Array(await file.arrayBuffer()));
+}
+
 function makeFile(blob, name, type) {
   const safeName = name.replace(/\.[^.]+$/, '');
   return new File([blob], `${safeName}.${type === 'image/webp' ? 'webp' : type === 'video/mp4' ? 'mp4' : 'webm'}`, {
@@ -218,14 +245,20 @@ export async function compressMediaFile(file, options = {}) {
   const isImage = file.type.startsWith('image/');
   const isVideo = file.type.startsWith('video/');
 
-  if (file.type === 'image/gif' || file.type === 'image/svg+xml' || (!isImage && !isVideo)) {
-    report(onProgress, 'done', 100, 'This media format is kept original to preserve its animation or file data.', {
+  if (file.type === 'image/svg+xml' || (!isImage && !isVideo)) {
+    report(onProgress, 'done', 100, 'This media format is kept original to preserve its file data.', {
       originalSize: file.size, outputSize: file.size, savedBytes: 0,
     });
     return { file, compressed: false, reason: 'format-preserved' };
   }
 
   try {
+    if (isImage && await fileHasAnimation(file)) {
+      report(onProgress, 'done', 100, 'Animation detected. Keeping every frame original so it stays animated.', {
+        originalSize: file.size, outputSize: file.size, savedBytes: 0,
+      });
+      return { file, compressed: false, reason: 'animation-preserved' };
+    }
     if (isImage) return await compressImage(file, options, onProgress);
     return await compressVideo(file, options, onProgress);
   } catch (error) {
