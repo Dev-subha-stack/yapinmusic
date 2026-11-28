@@ -35,6 +35,7 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
 
   function appendProfileDecoration(container, profile) {
     if (!container || !profile) return;
+    if (container.querySelector('.profile-decoration-overlay')) return;
     var presetImage = profile.active_preset_decoration
       ? getBuiltInDecorationImage(profile.active_preset_decoration)
       : '';
@@ -45,9 +46,28 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
     overlay.alt = '';
     overlay.setAttribute('aria-hidden', 'true');
     overlay.draggable = false;
-    overlay.onerror = function () { overlay.remove(); };
+    overlay.decoding = 'async';
+    overlay.onerror = function () {
+      overlay.remove();
+      if (!container.querySelector('.profile-decoration-overlay')) {
+        container.classList.remove('has-avatar-decoration');
+      }
+    };
     container.classList.add('has-avatar-decoration');
     container.appendChild(overlay);
+  }
+
+  // Replace a failed/missing avatar photo without clearing its decoration frame.
+  function showAvatarFallback(container, image, name) {
+    if (!container) return;
+    if (image && image.parentNode === container) image.remove();
+    var fallback = container.querySelector('.profile-avatar-fallback');
+    if (!fallback) fallback = el('span', 'profile-avatar-fallback');
+    var label = String(name || 'Y').trim();
+    fallback.textContent = label.charAt(0).toUpperCase() || 'Y';
+    var overlay = container.querySelector('.profile-decoration-overlay');
+    if (overlay) container.insertBefore(fallback, overlay);
+    else if (fallback.parentNode !== container) container.appendChild(fallback);
   }
 
   /* ============ THEME ============ */
@@ -1425,12 +1445,11 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
         image.alt = '';
         image.loading = 'lazy';
         image.onerror = function () {
-          triggerAvatar.innerHTML = '';
-          triggerAvatar.textContent = initials(profile.username);
+          showAvatarFallback(triggerAvatar, image, profile.username);
         };
         triggerAvatar.appendChild(image);
       } else {
-        triggerAvatar.textContent = profile ? initials(profile.username) : (accountState.user ? initials(accountState.user.name) : 'Y');
+        showAvatarFallback(triggerAvatar, null, profile ? profile.username : (accountState.user ? accountState.user.name : 'Y'));
       }
       appendProfileDecoration(triggerAvatar, profile);
       profileTrigger.title = accountState.user
@@ -1590,6 +1609,10 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
       if (profile.avatar_url) avatarImage.src = profile.avatar_url;
       var avatarFallback = el('span', null, initials(profile.username || accountState.user.name));
       avatarFallback.hidden = Boolean(profile.avatar_url);
+      avatarImage.onerror = function () {
+        avatarImage.hidden = true;
+        avatarFallback.hidden = false;
+      };
       avatarWrap.appendChild(avatarImage);
       avatarWrap.appendChild(avatarFallback);
       appendProfileDecoration(avatarWrap, profile);
@@ -1776,19 +1799,20 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
 
       function updateLiveHeaderAvatar(source) {
         if (!triggerAvatar) return;
-        triggerAvatar.innerHTML = '';
+        triggerAvatar.replaceChildren();
         if (source) {
           var headerImage = el('img');
           headerImage.src = source;
           headerImage.alt = '';
           headerImage.onerror = function () {
-            triggerAvatar.innerHTML = '';
-            triggerAvatar.textContent = initials(usernameField.input.value);
+            showAvatarFallback(triggerAvatar, headerImage, usernameField.input.value);
           };
           triggerAvatar.appendChild(headerImage);
         } else {
-          triggerAvatar.textContent = initials(usernameField.input.value);
+          showAvatarFallback(triggerAvatar, null, usernameField.input.value);
         }
+        // Keep the equipped frame visible while the profile photo is being edited.
+        appendProfileDecoration(triggerAvatar, accountState.profile);
       }
 
       function updatePreview() {
@@ -2010,10 +2034,12 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
           image.src = entry.avatar_url;
           image.alt = '';
           image.loading = 'lazy';
-          image.onerror = function () { avatar.textContent = initials(entry.username); };
+          image.onerror = function () {
+            showAvatarFallback(avatar, image, entry.username);
+          };
           avatar.appendChild(image);
         } else {
-          avatar.textContent = initials(entry.username);
+          showAvatarFallback(avatar, null, entry.username);
         }
         appendProfileDecoration(avatar, entry);
         personLink.appendChild(avatar);
@@ -2116,12 +2142,11 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
         avatarImage.alt = '';
         avatarImage.loading = 'lazy';
         avatarImage.onerror = function () {
-          avatarImage.remove();
-          avatar.textContent = initials(profile.username);
+          showAvatarFallback(avatar, avatarImage, profile.username);
         };
         avatar.appendChild(avatarImage);
       } else {
-        avatar.textContent = initials(profile.username);
+        showAvatarFallback(avatar, null, profile.username);
       }
       appendProfileDecoration(avatar, profile);
       identity.appendChild(avatar);
