@@ -2081,3 +2081,106 @@ body,
   width: 0;
   height: 0;
 }
+
+
+/* Admin-only desktop header layout.
+   Keep navigation inside its own grid area so it cannot overlap the brand or actions. */
+@media (min-width: 701px) and (max-width: 1550px) {
+  .site-head.has-admin-shortcut .wrap.top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 10px 18px;
+    width: min(100% - 48px, 1540px);
+    max-width: 1540px;
+    box-sizing: border-box;
+  }
+  .site-head.has-admin-shortcut .brand {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .site-head.has-admin-shortcut .head-actions {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    min-width: max-content;
+    gap: 8px;
+  }
+  .site-head.has-admin-shortcut nav#main-navigation {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    overflow: visible;
+  }
+  .site-head.has-admin-shortcut nav#main-navigation a {
+    min-width: 0;
+    flex: 0 1 auto;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 1551px) {
+  .site-head.has-admin-shortcut .wrap.top {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 12px clamp(10px, 1vw, 20px);
+    width: min(100% - 48px, 1760px);
+    max-width: 1760px;
+    box-sizing: border-box;
+  }
+  .site-head.has-admin-shortcut .brand {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: max-content;
+  }
+  .site-head.has-admin-shortcut nav#main-navigation {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px;
+    overflow: hidden;
+  }
+  .site-head.has-admin-shortcut nav#main-navigation a {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: clamp(4px, .4vw, 9px);
+    font-size: clamp(.76rem, .78vw, .9rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .site-head.has-admin-shortcut .head-actions {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    min-width: max-content;
+    gap: 8px;
+    white-space: nowrap;
+  }
+}
