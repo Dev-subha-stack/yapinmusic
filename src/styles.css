@@ -1978,12 +1978,37 @@ body.player-profile-open { overflow:hidden; }
   0%,22% { transform:translateX(-110%); }
   72%,100% { transform:translateX(110%); }
 }
-.profile-color-controls { display:flex; align-items:center; gap:12px; min-width:0; }
-.profile-color-input {
-  width:48px; height:42px; flex:none; padding:4px;
-  border:1px solid var(--line); border-radius:11px; background:var(--bg); cursor:pointer;
+.profile-color-controls {
+  display:grid;
+  grid-template-columns:48px minmax(0,1fr);
+  align-items:center;
+  gap:12px;
+  width:100%;
+  min-width:0;
 }
-.profile-color-swatches { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.profile-editor .lb-field .profile-color-input {
+  box-sizing:border-box;
+  display:block;
+  width:48px;
+  min-width:48px;
+  max-width:48px;
+  height:42px;
+  margin:0;
+  padding:4px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:var(--bg);
+  cursor:pointer;
+}
+.profile-color-swatches {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  width:100%;
+  min-width:0;
+}
 .profile-color-swatch {
   width:25px; height:25px; flex:none; padding:0;
   border:2px solid var(--surface); border-radius:50%;
@@ -2006,7 +2031,7 @@ body.player-profile-open { overflow:hidden; }
 }
 @media (max-width:600px) {
   .profile-style-fields { grid-template-columns:minmax(0,1fr); gap:8px; }
-  .profile-color-controls { flex-wrap:wrap; }
+  .profile-color-controls { grid-template-columns:48px minmax(0,1fr); gap:8px; }
   .profile-preview .profile-preview-tagline { margin-inline:13px; }
 }
 @media (prefers-reduced-motion:reduce) {
