@@ -3,7 +3,13 @@ import { requireNeonUser, sendApiError } from './_lib/auth.js';
 
 const PAGE_SIZE = 12;
 const MAX_IMAGE_LENGTH = 360000;
-const PRESET_DECORATION_IDS = new Set(['neon-orbit', 'ember-ring', 'starlight', 'sakura-bloom', 'frostline', 'emerald-leaves']);
+const PRESET_DECORATION_IDS = new Set(['aurora-halo', 'royal-amethyst', 'solar-flare', 'sakura-royale', 'ocean-crown', 'cyber-prism', 'celestial-rose', 'emerald-empress']);
+const LEGACY_PRESET_ALIASES = Object.freeze({ 'neon-orbit': 'aurora-halo', 'ember-ring': 'solar-flare', starlight: 'royal-amethyst', 'sakura-bloom': 'sakura-royale', frostline: 'ocean-crown', 'emerald-leaves': 'emerald-empress' });
+
+function normalizePresetDecorationId(value) {
+  const id = String(value || '');
+  return LEGACY_PRESET_ALIASES[id] || id;
+}
 
 function badRequest(message) {
   const error = new Error(message);
@@ -32,7 +38,7 @@ async function readSummary(pool, userId) {
   const artistBadge = Boolean(row.artist_badge);
   return {
     activeDecorationId: row.active_decoration_id || null,
-    activePresetDecoration: row.active_preset_decoration || null,
+    activePresetDecoration: row.active_preset_decoration ? normalizePresetDecorationId(row.active_preset_decoration) : null,
     artistBadge,
     pendingCount: Number(row.pending_count) || 0,
     submissionLimit: artistBadge ? 6 : 3
@@ -53,7 +59,8 @@ async function readPresetWearCounts(pool) {
     'select active_preset_decoration as id, count(*)::integer as wearer_count from public.player_profiles where active_preset_decoration is not null group by active_preset_decoration'
   );
   return result.rows.reduce((counts, row) => {
-    counts[row.id] = Number(row.wearer_count) || 0;
+    const id = normalizePresetDecorationId(row.id);
+    counts[id] = (counts[id] || 0) + (Number(row.wearer_count) || 0);
     return counts;
   }, {});
 }
