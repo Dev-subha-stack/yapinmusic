@@ -110,7 +110,7 @@ For local development, copy `.env.example` to `.env.local` and fill in `DATABASE
 
 Players can optionally link a Yapin account from **Profile → Yapin verification**. Yapin Music requests only the `identify` scope and shows the verified badge on the player's public profile and leaderboard after Yapin confirms the identity. Linking does not replace the existing Neon Auth account.
 
-The OAuth callback must be registered with Yapin as `https://yapinmusic.vercel.app/`. The implementation uses Authorization Code with S256 PKCE and a short-lived, single-use server-side state record. Yapin access tokens are used only to retrieve the identity and are not stored. The database migration is `neon/migrations/20261128000000_yapin_verification.sql`.
+The OAuth callback must be registered with Yapin as `https://yapinmusic.vercel.app/`. The implementation uses Authorization Code with S256 PKCE and a short-lived, single-use server-side state record. Yapin access tokens are used only to retrieve the identity and are not stored. The database migration is `neon/migrations/20261128000000_yapin_login.sql`.
 
 ## Development notes
 
