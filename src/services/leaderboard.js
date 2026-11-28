@@ -248,7 +248,11 @@ export async function completeYapinVerification({ code, state } = {}) {
     method: 'POST',
     body: JSON.stringify({ code, state })
   });
-  currentProfile = { ...(currentProfile || {}), ...(result.profile || {}) };
+  try {
+    await loadProfile();
+  } catch {
+    currentProfile = { ...(currentProfile || {}), ...(result.profile || {}) };
+  }
   accountError = null;
   notifyAccount();
   return currentProfile;
