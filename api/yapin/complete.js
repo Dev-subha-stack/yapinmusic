@@ -1,15 +1,37 @@
 import { createHash } from 'node:crypto';
+import { SignJWT } from 'jose';
 import { getPool } from '../_lib/db.js';
-import { requireNeonUser, sendApiError } from '../_lib/auth.js';
+import { sendApiError } from '../_lib/auth.js';
 
 const CLIENT_ID = '6dd7023b-622a-4fbe-a730-fec0637bbee3';
 const REDIRECT_URI = 'https://yapinmusic.vercel.app/';
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SESSION_ISSUER = 'https://yapinmusic.vercel.app';
+const SESSION_AUDIENCE = 'yapinmusic-web';
 
 function upstreamError(message) {
   const error = new Error(message);
   error.statusCode = 502;
   return error;
+}
+
+function normalizeYapinUser(body) {
+  const user = body && (body.user || (body.data && (body.data.user || body.data)) || body);
+  const id = user && user.id != null ? String(user.id).trim() : '';
+  const username = String(user && (user.username || user.user_name || user.handle) || '').trim();
+  const displayName = String(user && (user.display_name || user.displayName || user.name) || username).trim();
+  if (!id || id.length > 128 || !username || username.length > 80 || !displayName || displayName.length > 100) {
+    throw upstreamError('Yapin returned an account profile in an unexpected format.');
+  }
+  return { id, username, displayName };
+}
+
+function profileUsername(username, stableHash) {
+  const cleaned = String(username || '')
+    .replace(/[^\p{L}\p{N}_. -]/gu, '')
+    .trim()
+    .replace(/\s+/g, ' ');
+  const base = Array.from(cleaned || 'Yapin').slice(0, 17).join('');
+  return base + '-' + stableHash.slice(0, 6);
 }
 
 export default async function handler(req, res) {
@@ -20,24 +42,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId } = await requireNeonUser(req);
     const body = req.body || {};
     const code = String(body.code || '').trim();
     const state = String(body.state || '').trim();
     if (!code || code.length > 2048 || !state || state.length > 256) {
-      return res.status(400).json({ error: 'The Yapin verification response is incomplete. Please try again.' });
+      return res.status(400).json({ error: 'The Yapin sign-in response is incomplete. Please try again.' });
     }
 
     const pool = getPool();
     const stateHash = createHash('sha256').update(state).digest('base64url');
     const claimedState = await pool.query(
       `delete from public.yapin_oauth_states
-        where state_hash = $1 and user_id = $2 and expires_at > now()
+        where state_hash = $1 and flow = 'login' and user_id is null and expires_at > now()
         returning code_verifier`,
-      [stateHash, userId]
+      [stateHash]
     );
     if (!claimedState.rowCount) {
-      return res.status(400).json({ error: 'This Yapin verification link has expired or does not match your signed-in account. Start verification again.' });
+      return res.status(400).json({ error: 'This Yapin sign-in link has expired or was already used. Start again.' });
     }
 
     const form = new URLSearchParams({
@@ -54,7 +75,7 @@ export default async function handler(req, res) {
     });
     const tokenBody = await tokenResponse.json().catch(() => null);
     if (!tokenResponse.ok || !tokenBody || typeof tokenBody.access_token !== 'string' || !tokenBody.access_token) {
-      throw upstreamError('Yapin could not complete the verification. Please start again.');
+      throw upstreamError('Yapin could not complete sign-in. Please try again.');
     }
 
     const userResponse = await fetch('https://www.yapin.gg/api/oauth/me', {
@@ -66,40 +87,111 @@ export default async function handler(req, res) {
     });
     const userBody = await userResponse.json().catch(() => null);
     if (!userResponse.ok || !userBody) {
-      throw upstreamError('Yapin did not return a verified account. Please start again.');
+      throw upstreamError('Yapin did not return a signed-in account. Please try again.');
     }
 
-    const yapinUser = userBody.user || (userBody.data && userBody.data.user) || userBody;
-    const yapinUserId = String(yapinUser.id || '').trim();
-    const yapinUsername = String(yapinUser.username || '').trim();
-    const yapinDisplayName = String(yapinUser.display_name || yapinUser.displayName || yapinUser.name || yapinUsername).trim();
+    const yapinUser = normalizeYapinUser(userBody);
+    const stableHash = createHash('sha256').update(yapinUser.id).digest('hex');
+    const internalEmail = 'yapin-' + stableHash + '@accounts.yapinmusic.invalid';
+    const preferredUsername = profileUsername(yapinUser.username, stableHash);
 
-    if (!UUID_PATTERN.test(yapinUserId) || !yapinUsername || yapinUsername.length > 80 || !yapinDisplayName || yapinDisplayName.length > 100) {
-      throw upstreamError('Yapin returned an account profile in an unexpected format. Please try again later.');
+    await pool.query('begin');
+    try {
+      const existing = await pool.query(
+        `select p.user_id
+           from public.player_profiles p
+          where p.yapin_user_id = $1
+          limit 1
+          for update`,
+        [yapinUser.id]
+      );
+
+      let userId;
+      if (existing.rowCount) {
+        userId = existing.rows[0].user_id;
+        await pool.query(
+          `update public.player_profiles
+              set yapin_username = $2,
+                  yapin_display_name = $3,
+                  updated_at = now()
+            where user_id = $1`,
+          [userId, yapinUser.username, yapinUser.displayName]
+        );
+      } else {
+        const createdUser = await pool.query(
+          `insert into neon_auth."user" ("name", "email", "emailVerified", "createdAt", "updatedAt")
+           values ($1, $2, false, now(), now())
+           on conflict ("email") do update
+             set "name" = excluded."name",
+                 "updatedAt" = now()
+           returning "id"`,
+          [yapinUser.displayName, internalEmail]
+        );
+        userId = createdUser.rows[0].id;
+
+        await pool.query(
+          `insert into public.player_profiles
+             (user_id, username, yapin_user_id, yapin_username, yapin_display_name, yapin_verified_at)
+           values ($1, $2, $3, $4, $5, now())
+           on conflict (user_id) do update
+             set yapin_user_id = excluded.yapin_user_id,
+                 yapin_username = excluded.yapin_username,
+                 yapin_display_name = excluded.yapin_display_name,
+                 yapin_verified_at = now(),
+                 updated_at = now()`,
+          [userId, preferredUsername, yapinUser.id, yapinUser.username, yapinUser.displayName]
+        );
+      }
+
+      const profileResult = await pool.query(
+        `select p.user_id, p.username, p.bio, p.avatar_url, p.banner_url,
+                coalesce(l.total_points, 0)::integer as total_points,
+                coalesce(l.wins, 0)::integer as wins,
+                coalesce(l.games_played, 0)::integer as games_played,
+                l.rank_position, p.yapin_username
+           from public.player_profiles p
+           left join public.player_leaderboard l on l.user_id = p.user_id
+          where p.user_id = $1
+          limit 1`,
+        [userId]
+      );
+      await pool.query('commit');
+
+      const secret = String(process.env.YAPIN_SESSION_SECRET || '');
+      if (secret.length < 48) throw new Error('The Yapin session signing secret is not configured.');
+      const sessionToken = await new SignJWT({
+        provider: 'yapin',
+        yapinUserId: yapinUser.id,
+        yapinUsername: yapinUser.username
+      })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setSubject(String(userId))
+        .setIssuer(SESSION_ISSUER)
+        .setAudience(SESSION_AUDIENCE)
+        .setIssuedAt()
+        .setExpirationTime('30d')
+        .sign(new TextEncoder().encode(secret));
+
+      res.setHeader('Set-Cookie',
+        'yapinmusic_session=' + sessionToken + '; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000'
+      );
+      return res.status(200).json({
+        signedIn: true,
+        user: {
+          id: String(userId),
+          name: yapinUser.displayName,
+          email: null,
+          provider: 'yapin',
+          yapinUserId: yapinUser.id,
+          yapinUsername: yapinUser.username
+        },
+        profile: profileResult.rows[0] || null
+      });
+    } catch (error) {
+      await pool.query('rollback');
+      throw error;
     }
-
-    const updated = await pool.query(
-      `update public.player_profiles
-          set yapin_user_id = $1,
-              yapin_username = $2,
-              yapin_display_name = $3,
-              yapin_verified_at = now(),
-              updated_at = now()
-        where user_id = $4
-        returning user_id, username, bio, avatar_url, banner_url,
-                  yapin_username, yapin_display_name, yapin_verified_at`,
-      [yapinUserId, yapinUsername, yapinDisplayName, userId]
-    );
-    if (!updated.rowCount) {
-      return res.status(404).json({ error: 'Your Yapin Music player profile could not be found.' });
-    }
-
-    return res.status(200).json({ verified: true, profile: updated.rows[0] });
   } catch (error) {
-    if (error && error.code === '23505') {
-      error.statusCode = 409;
-      error.message = 'This Yapin account is already linked to another Yapin Music profile.';
-    }
     return sendApiError(res, error);
   }
 }
