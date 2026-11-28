@@ -1219,30 +1219,7 @@ select {
 .public-player-stat { display:grid; gap:7px; min-width:0; padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:var(--bg); }
 .public-player-stat span { color:var(--muted); font-size:.75rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
 .public-player-stat strong { color:var(--fg); font:800 clamp(1.25rem,3vw,1.8rem) var(--f-display); font-variant-numeric:tabular-nums; }
-.profile-music-editor {
-  display:grid; gap:12px; min-width:0; padding:18px;
-  border:1px solid var(--line); border-radius:18px; background:var(--bg);
-}
-.profile-music-help { color:var(--muted); font-size:.87rem; line-height:1.55; }
-.profile-music-subheading { color:var(--fg); font-size:.92rem; }
-.profile-music-visibility { display:flex; align-items:center; gap:10px; padding:11px 12px; border:1px solid var(--line); border-radius:12px; color:var(--fg); font-size:.88rem; font-weight:700; }
-.profile-music-visibility input { width:18px; height:18px; accent-color:var(--accent); }
-.public-player-music { display:grid; gap:16px; margin-top:24px; padding:20px; border:1px solid var(--line); border-radius:18px; background:var(--bg); }
-.public-player-music-header { display:grid; gap:4px; }
-.public-player-music-kicker { color:var(--accent); font-size:.68rem; font-weight:900; letter-spacing:.14em; }
-.public-player-music-header h3 { margin:0; font:800 1.25rem var(--f-display); }
-.public-music-group { display:grid; gap:8px; }
-.public-music-label { color:var(--muted); font-size:.72rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
-.public-music-item { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; padding:12px 13px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
-.public-music-copy { display:grid; gap:4px; min-width:0; }
-.public-music-copy strong { overflow-wrap:anywhere; font-size:.91rem; }
-.public-music-copy span { color:var(--muted); font-size:.8rem; }
-.public-music-link { flex:none; color:var(--accent); font-size:.79rem; font-weight:800; text-decoration:none; }
-.public-music-link:hover { text-decoration:underline; }
 @media (max-width:420px) {
-  .public-player-music { padding:14px; }
-  .public-music-item { align-items:flex-start; flex-direction:column; gap:7px; }
-  .profile-music-editor { padding:13px; }
 
   .lb-row { grid-template-columns:34px minmax(0,1fr) auto; gap:8px; padding:10px; }
   .lb-row .lb-rank-tag { grid-column:2; grid-row:2; }
