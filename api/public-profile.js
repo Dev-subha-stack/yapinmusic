@@ -16,6 +16,7 @@ export default async function handler(req, res) {
   try {
     const { rows } = await getPool().query(
       `select p.user_id, p.username, p.bio, p.avatar_url, p.banner_url,
+              case when p.music_is_public then p.music_profile else null::jsonb end as music_profile,
               coalesce(l.total_points, 0)::integer as total_points,
               coalesce(l.wins, 0)::integer as wins,
               coalesce(l.games_played, 0)::integer as games_played,
