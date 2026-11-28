@@ -33,6 +33,23 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
     node.style.setProperty('--profile-accent', safeProfileColor(profile.accent_color));
   }
 
+  function appendProfileDecoration(container, profile) {
+    if (!container || !profile) return;
+    var presetImage = profile.active_preset_decoration
+      ? getBuiltInDecorationImage(profile.active_preset_decoration)
+      : '';
+    var imageSource = profile.active_decoration_image || profile.active_decoration_url || presetImage;
+    if (!imageSource) return;
+    var overlay = el('img', 'profile-decoration-overlay');
+    overlay.src = imageSource;
+    overlay.alt = '';
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.draggable = false;
+    overlay.onerror = function () { overlay.remove(); };
+    container.classList.add('has-avatar-decoration');
+    container.appendChild(overlay);
+  }
+
   /* ============ THEME ============ */
   var themeButton = $('#theme-toggle');
   var themeMode = ls.get('yapin:theme');
@@ -1332,12 +1349,15 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
       var ul = el('ul', 'members');
       tier.members.forEach(function (m) {
         var li = el('li', 'member');
-        var img = el('img'); img.src = m.avatar || ICON; img.alt = ''; img.width = 56; img.height = 56;
+        var avatarFrame = el('div', 'member-avatar-frame');
+        var img = el('img'); img.src = m.avatar || ICON; img.alt = ''; img.width = 48; img.height = 48;
+        avatarFrame.appendChild(img);
         if (m.profileUserId) {
           getPublicProfile(m.profileUserId).then(function (profile) {
             if (profile && profile.avatar_url) img.src = profile.avatar_url;
+            appendProfileDecoration(avatarFrame, profile);
           }).catch(function (error) {
-            console.warn('Could not sync the Site Developers profile picture.', error);
+            console.warn('Could not sync the Site Developers profile picture and decoration.', error);
           });
         }
         var who = el('div', 'who');
@@ -1351,7 +1371,7 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
           who.appendChild(el('div', 'nm', m.name));
         }
         who.appendChild(el('div', 'hd', m.handle));
-        li.appendChild(img); li.appendChild(who); ul.appendChild(li);
+        li.appendChild(avatarFrame); li.appendChild(who); ul.appendChild(li);
       });
       if (!tier.members.length) ul.appendChild(el('li', 'vacant', 'No one in this role yet.'));
       sec.appendChild(info); sec.appendChild(ul); list.appendChild(sec);
@@ -1395,22 +1415,6 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
       return String(name || 'Y').trim().charAt(0).toUpperCase() || 'Y';
     }
 
-    function appendAvatarDecoration(container, profile) {
-      if (!container || !profile) return;
-      var presetImage = profile.active_preset_decoration
-        ? getBuiltInDecorationImage(profile.active_preset_decoration)
-        : '';
-      var imageSource = profile.active_decoration_image || presetImage;
-      if (!imageSource) return;
-      var overlay = el('img', 'profile-decoration-overlay');
-      overlay.src = imageSource;
-      overlay.alt = '';
-      overlay.setAttribute('aria-hidden', 'true');
-      overlay.draggable = false;
-      overlay.onerror = function () { overlay.remove(); };
-      container.appendChild(overlay);
-    }
-
     function updateHeaderProfile() {
       if (!triggerAvatar || !profileTrigger) return;
       triggerAvatar.innerHTML = '';
@@ -1428,7 +1432,7 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
       } else {
         triggerAvatar.textContent = profile ? initials(profile.username) : (accountState.user ? initials(accountState.user.name) : 'Y');
       }
-      appendAvatarDecoration(triggerAvatar, profile);
+      appendProfileDecoration(triggerAvatar, profile);
       profileTrigger.title = accountState.user
         ? 'Open ' + ((profile && profile.username) || accountState.user.name || 'your') + ' profile'
         : 'Sign in or create your player profile';
@@ -1588,7 +1592,7 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
       avatarFallback.hidden = Boolean(profile.avatar_url);
       avatarWrap.appendChild(avatarImage);
       avatarWrap.appendChild(avatarFallback);
-      appendAvatarDecoration(avatarWrap, profile);
+      appendProfileDecoration(avatarWrap, profile);
       var avatarPicker = el('input', 'profile-file-input');
       avatarPicker.type = 'file';
       avatarPicker.accept = '.png,.apng,.jpg,.jpeg,.webp,.gif,image/png,image/apng,image/jpeg,image/webp,image/gif';
@@ -2011,6 +2015,7 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
         } else {
           avatar.textContent = initials(entry.username);
         }
+        appendProfileDecoration(avatar, entry);
         personLink.appendChild(avatar);
         var identity = el('div', 'lb-identity');
         identity.appendChild(el('strong', null, entry.username));
@@ -2076,22 +2081,6 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
     var panel = root && $('[data-public-profile-panel]', root);
     var requestNumber = 0;
 
-    function appendAvatarDecoration(container, profile) {
-      if (!container || !profile) return;
-      var presetImage = profile.active_preset_decoration
-        ? getBuiltInDecorationImage(profile.active_preset_decoration)
-        : '';
-      var imageSource = profile.active_decoration_image || presetImage;
-      if (!imageSource) return;
-      var overlay = el('img', 'profile-decoration-overlay');
-      overlay.src = imageSource;
-      overlay.alt = '';
-      overlay.setAttribute('aria-hidden', 'true');
-      overlay.draggable = false;
-      overlay.onerror = function () { overlay.remove(); };
-      container.appendChild(overlay);
-    }
-
     function initials(name) {
       return String(name || 'Y').trim().charAt(0).toUpperCase() || 'Y';
     }
@@ -2134,7 +2123,7 @@ import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
       } else {
         avatar.textContent = initials(profile.username);
       }
-      appendAvatarDecoration(avatar, profile);
+      appendProfileDecoration(avatar, profile);
       identity.appendChild(avatar);
 
       var nameBlock = el('div', 'public-player-name-block');
