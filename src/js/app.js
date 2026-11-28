@@ -1359,7 +1359,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     var refreshButton = boardRoot && $('[data-lb-refresh]', boardRoot);
     var profileTrigger = document.getElementById('profile-trigger');
     var triggerAvatar = profileTrigger && $('[data-profile-trigger-avatar]', profileTrigger);
-    var authMode = 'signup';
+    var authMode = 'login';
     var accountState = getAccountState();
     var entries = [];
     var initialized = false;
