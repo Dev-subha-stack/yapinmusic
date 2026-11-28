@@ -605,3 +605,26 @@
   z-index: 4 !important;
   pointer-events: none;
 }
+
+
+/* Consistent initials fallback for avatars with missing/broken profile photos.
+   The decoration overlay stays above the photo/fallback at every size. */
+.profile-avatar-fallback {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  pointer-events: none;
+}
+.member-avatar-frame {
+  display: grid;
+  place-items: center;
+  color: var(--accent, #ff6b35);
+  font-weight: 850;
+  font-size: .95rem;
+}
