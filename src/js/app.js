@@ -1562,7 +1562,10 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         verificationAction.disabled = true;
         try {
           if (profile.yapin_verified_at) {
-            if (!window.confirm('Disconnect this Yapin account? Your Yapin Music profile and points will stay unchanged.')) return;
+            if (!window.confirm('Disconnect this Yapin account? Your Yapin Music profile and points will stay unchanged.')) {
+              verificationAction.disabled = false;
+              return;
+            }
             await unlinkYapinVerification();
             toast('Yapin account disconnected.');
             renderProfile(getAccountState());
