@@ -51,7 +51,7 @@ export default async function handler(req, res) {
 
     const pool = getPool();
     const stateHash = createHash('sha256').update(state).digest('base64url');
-    const claimedState = await client.query(
+    const claimedState = await pool.query(
       `delete from public.yapin_oauth_states
         where state_hash = $1 and flow = 'login' and user_id is null and expires_at > now()
         returning code_verifier`,
