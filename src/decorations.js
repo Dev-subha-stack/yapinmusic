@@ -4,6 +4,7 @@ import {
   getDecorations,
   submitCommunityDecoration,
   wearCommunityDecoration,
+  wearPresetDecoration,
   removeCommunityDecoration,
   withdrawCommunityDecoration,
   sendPresenceHeartbeat,
@@ -244,6 +245,8 @@ export function createDecorationsUI() {
     const grid = el('div', 'community-decor-grid community-included-grid');
     PRESET_DECORATIONS.forEach(function (item) {
       const card = el('article', 'community-decor-card community-included-card');
+      card.dataset.decorationId = item.id;
+      card.style.setProperty('--preset-accent', item.accent || '#ff6b35');
       renderDecorationImage(card, getBuiltInDecorationImage(item.id), item.name);
       const details = el('div', 'community-decor-details');
       details.appendChild(el('h3', null, item.name));
