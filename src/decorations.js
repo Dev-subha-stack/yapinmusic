@@ -750,11 +750,14 @@ export function createAdminUI() {
 
 export function initPresenceAndAdminLink() {
   const adminLink = document.querySelector('[data-admin-panel-button]');
+  const siteHeader = document.querySelector('.site-head');
   let currentUserId = '';
   let adminCheckFor = '';
 
   function setAdminLink(visible) {
-    if (adminLink) adminLink.hidden = !visible;
+    const isAdmin = Boolean(visible);
+    if (adminLink) adminLink.hidden = !isAdmin;
+    if (siteHeader) siteHeader.classList.toggle('has-admin-shortcut', isAdmin);
   }
 
   async function checkAdmin(userId) {
