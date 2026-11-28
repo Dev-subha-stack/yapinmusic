@@ -4,11 +4,12 @@ import { searchBandInfo, searchSongInfo } from '../services/music-info.js';
 import { storage as ls } from '../services/storage.js';
 import {
   getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername, saveProfileDetails,
-  getLeaderboard, getPublicProfile, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured,
+  getLeaderboard, getPublicProfile, getPlayerLeaderboardEntry, wearCommunityDecoration, rankFor, submitScore, isLeaderboardConfigured,
   getDailyTasks, claimDailyReward, startYapinLogin, completeYapinLogin
 } from '../services/leaderboard.js';
 import { compressMediaFile, formatMediaBytes } from '../mediaCompressor.js';
 import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
+import { createDecorationsUI, createAdminUI, initPresenceAndAdminLink } from '../decorations.js';
 
 (function () {
   'use strict';
@@ -1393,6 +1394,17 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       return String(name || 'Y').trim().charAt(0).toUpperCase() || 'Y';
     }
 
+    function appendAvatarDecoration(container, profile) {
+      if (!container || !profile || !profile.active_decoration_image) return;
+      var overlay = el('img', 'profile-decoration-overlay');
+      overlay.src = profile.active_decoration_image;
+      overlay.alt = '';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.draggable = false;
+      overlay.onerror = function () { overlay.remove(); };
+      container.appendChild(overlay);
+    }
+
     function updateHeaderProfile() {
       if (!triggerAvatar || !profileTrigger) return;
       triggerAvatar.innerHTML = '';
@@ -1410,6 +1422,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       } else {
         triggerAvatar.textContent = profile ? initials(profile.username) : (accountState.user ? initials(accountState.user.name) : 'Y');
       }
+      appendAvatarDecoration(triggerAvatar, profile);
       profileTrigger.title = accountState.user
         ? 'Open ' + ((profile && profile.username) || accountState.user.name || 'your') + ' profile'
         : 'Sign in or create your player profile';
@@ -1569,6 +1582,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       avatarFallback.hidden = Boolean(profile.avatar_url);
       avatarWrap.appendChild(avatarImage);
       avatarWrap.appendChild(avatarFallback);
+      appendAvatarDecoration(avatarWrap, profile);
       var avatarPicker = el('input', 'profile-file-input');
       avatarPicker.type = 'file';
       avatarPicker.accept = '.png,.apng,.jpg,.jpeg,.webp,.gif,image/png,image/apng,image/jpeg,image/webp,image/gif';
@@ -1579,9 +1593,13 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       identity.appendChild(avatarWrap);
       var previewText = el('div', 'profile-preview-text');
       previewText.appendChild(el('strong', 'profile-preview-name', profile.username || accountState.user.name || 'Your player name'));
+      if (profile.artist_badge) previewText.appendChild(el('span', 'artist-badge', '✦ Artist'));
       previewText.appendChild(el('span', 'profile-preview-rank', (profile.rank_position ? '#' + profile.rank_position + ' · ' : '') + rankFor(profile.total_points || 0).name));
       identity.appendChild(previewText);
       preview.appendChild(identity);
+      var decorationLink = el('a', 'btn profile-decoration-manage', 'Change avatar decoration');
+      decorationLink.href = '#decorations';
+      preview.appendChild(decorationLink);
       var previewTagline = el('p', 'profile-preview-tagline', profile.tagline || 'Your one-line status will appear here.');
       preview.appendChild(previewTagline);
       var previewBio = el('p', 'profile-preview-bio', profile.bio || 'Your bio will appear here. Tell the community a little about yourself.');
@@ -2102,10 +2120,12 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       } else {
         avatar.textContent = initials(profile.username);
       }
+      appendAvatarDecoration(avatar, profile);
       identity.appendChild(avatar);
 
       var nameBlock = el('div', 'public-player-name-block');
       nameBlock.appendChild(el('h2', null, profile.username || 'Yapin Player'));
+      if (profile.artist_badge) nameBlock.appendChild(el('span', 'artist-badge', '✦ Artist'));
       var rank = rankFor(profile.total_points);
       var rankLine = rank.name;
       if (profile.rank_position) rankLine += ' · #' + profile.rank_position + ' on the leaderboard';
@@ -2131,6 +2151,44 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         stats.appendChild(block);
       });
       content.appendChild(stats);
+
+      var creations = Array.isArray(profile.created_decorations) ? profile.created_decorations : [];
+      if (creations.length) {
+        var creationSection = el('section', 'public-player-creations');
+        creationSection.appendChild(el('h3', null, 'Creations by ' + (profile.username || 'this artist')));
+        creationSection.appendChild(el('p', 'public-player-creations-note', 'Approved avatar decorations from this artist. Try one on your own profile.'));
+        var creationGrid = el('div', 'public-player-creations-grid');
+        creations.forEach(function (item) {
+          var creation = el('article', 'public-player-creation');
+          var art = el('img');
+          art.src = item.image_data;
+          art.alt = item.name + ' avatar decoration';
+          art.loading = 'lazy';
+          creation.appendChild(art);
+          creation.appendChild(el('strong', null, item.name));
+          creation.appendChild(el('small', null, String(item.wearer_count || 0) + ' wearing'));
+          var wearButton = el('button', 'btn primary', getAccountState().user ? 'Wear decoration' : 'Sign in to wear');
+          wearButton.type = 'button';
+          wearButton.addEventListener('click', async function () {
+            if (!getAccountState().user) { location.hash = '#profile'; return; }
+            wearButton.disabled = true;
+            wearButton.textContent = 'Adding…';
+            try {
+              await wearCommunityDecoration(item.id);
+              wearButton.textContent = 'Added to your avatar';
+              toast('Decoration applied to your avatar!');
+            } catch (error) {
+              wearButton.disabled = false;
+              wearButton.textContent = 'Wear decoration';
+              toast(error.message || 'Could not wear this decoration.');
+            }
+          });
+          creation.appendChild(wearButton);
+          creationGrid.appendChild(creation);
+        });
+        creationSection.appendChild(creationGrid);
+        content.appendChild(creationSection);
+      }
 
       card.appendChild(content);
       panel.appendChild(card);
@@ -2347,11 +2405,15 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   var leaderboardUI = createLeaderboardUI();
   var publicProfileUI = createPublicProfileUI();
   var tasksUI = createTasksUI();
+  var decorationsUI = createDecorationsUI();
+  var adminUI = createAdminUI();
   var profileUI = leaderboardUI;
+  subscribeAccount(function (state) { decorationsUI.onAccountChange(state); });
+  initPresenceAndAdminLink();
 
   /* ============ ROUTES ============ */
 
-  var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'tasks', 'profile', 'player-profile', 'our-team'];
+  var VIEWS = ['home', 'song', 'band', 'explore', 'leaderboard', 'tasks', 'decorations', 'admin', 'profile', 'player-profile', 'our-team'];
   var mobileNavToggle = document.getElementById('mobile-nav-toggle');
   var mobileNav = document.getElementById('main-navigation');
 
@@ -2419,6 +2481,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     if ((h === 'leaderboard' || h === 'profile' || isPlayerOverlay) && leaderboardUI) leaderboardUI.init();
     if (isPlayerOverlay && publicProfileUI) publicProfileUI.show(publicProfileId);
     if (h === 'tasks' && tasksUI) tasksUI.init();
+    if (h === 'decorations' && decorationsUI) decorationsUI.init();
+    if (h === 'admin' && adminUI) adminUI.init();
     if (queuedRandomGame === h && active && active.random) {
       active.random();
       queuedRandomGame = null;
