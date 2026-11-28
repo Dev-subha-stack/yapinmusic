@@ -463,7 +463,7 @@ export function createDecorationsUI() {
         root.appendChild(pageWrap);
       }
     } finally {
-      loading = false;
+      if (request === loadRequest) loading = false;
     }
   }
 
@@ -477,7 +477,10 @@ export function createDecorationsUI() {
       accountState = state;
       const nextId = accountState.user && accountState.user.id;
       if (previousId !== nextId) {
+        loadRequest += 1;
+        loading = false;
         snapshot = null;
+        page = 1;
         refresh();
       }
     }

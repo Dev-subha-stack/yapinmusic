@@ -287,3 +287,16 @@
   .admin-stats { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
   .admin-stat-card { padding: 13px; }
 }
+
+.profile-preview-avatar > img.profile-decoration-overlay,
+.profile-trigger-avatar > img.profile-decoration-overlay,
+.public-player-avatar > img.profile-decoration-overlay {
+  position: absolute !important;
+  inset: -15% !important;
+  width: 130% !important;
+  height: 130% !important;
+  max-width: none !important;
+  object-fit: contain !important;
+  border-radius: 0 !important;
+  z-index: 4 !important;
+}

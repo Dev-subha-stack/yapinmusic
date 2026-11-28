@@ -450,7 +450,8 @@ export function configureLeaderboardAdapter(nextAdapter) {
 
 export async function getDecorations(page = 1) {
   const cleanPage = Math.max(1, Math.min(100, Number(page) || 1));
-  return apiRequest('/api/decorations?page=' + cleanPage, { method: 'GET' }, false);
+  const hasSession = Boolean(currentSession && currentUser);
+  return apiRequest('/api/decorations?page=' + cleanPage, { method: 'GET' }, hasSession);
 }
 
 export async function submitCommunityDecoration({ name, imageData, originalArtAttested } = {}) {
