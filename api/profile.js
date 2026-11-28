@@ -24,8 +24,6 @@ function validImageData(value, maxLength) {
 async function readProfile(pool, userId) {
   const { rows } = await pool.query(
     `select p.user_id, p.username, p.bio, p.avatar_url, p.banner_url,
-            coalesce(p.music_profile, '{"recentTrack":null,"favoriteTracks":[],"playlists":[]}'::jsonb) as music_profile,
-            coalesce(p.music_is_public, false) as music_is_public,
             coalesce(l.total_points, 0)::integer as total_points,
             coalesce(l.wins, 0)::integer as wins,
             coalesce(l.games_played, 0)::integer as games_played,
