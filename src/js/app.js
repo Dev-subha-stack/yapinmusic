@@ -23,6 +23,13 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
   var NEED = 3;
   function $(sel, root) { return (root || document).querySelector(sel); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function safeProfileColor(value) { var color = String(value || '').trim(); return /^#[0-9a-f]{6}$/i.test(color) ? color : '#FF6B35'; }
+  function safeProfileChoice(value, choices, fallback) { return choices.indexOf(value) >= 0 ? value : fallback; }
+  function setProfileAppearance(node, profile) {
+    node.dataset.cardStyle = safeProfileChoice(profile.card_style, ['classic', 'sunset', 'ocean', 'aurora', 'midnight'], 'classic');
+    node.dataset.profileEffect = safeProfileChoice(profile.profile_effect, ['none', 'glow', 'shimmer'], 'none');
+    node.style.setProperty('--profile-accent', safeProfileColor(profile.accent_color));
+  }
 
   /* ============ THEME ============ */
   var themeButton = $('#theme-toggle');
@@ -1532,6 +1539,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var profile = accountState.profile || {};
       var summary = el('div', 'profile-editor-layout');
       var preview = el('section', 'profile-preview');
+      setProfileAppearance(preview, profile);
       var cover = el('div', 'profile-cover');
       var coverImage = el('img', 'profile-cover-image');
       coverImage.alt = 'Profile banner preview';
@@ -1552,6 +1560,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
       var identity = el('div', 'profile-preview-identity');
       var avatarWrap = el('div', 'profile-preview-avatar');
+      avatarWrap.dataset.avatarShape = safeProfileChoice(profile.avatar_shape, ['circle', 'rounded', 'square'], 'rounded');
       var avatarImage = el('img');
       avatarImage.alt = 'Profile picture preview';
       avatarImage.hidden = !profile.avatar_url;
@@ -1573,6 +1582,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       previewText.appendChild(el('span', 'profile-preview-rank', (profile.rank_position ? '#' + profile.rank_position + ' · ' : '') + rankFor(profile.total_points || 0).name));
       identity.appendChild(previewText);
       preview.appendChild(identity);
+      var previewTagline = el('p', 'profile-preview-tagline', profile.tagline || 'Your one-line status will appear here.');
+      preview.appendChild(previewTagline);
       var previewBio = el('p', 'profile-preview-bio', profile.bio || 'Your bio will appear here. Tell the community a little about yourself.');
       preview.appendChild(previewBio);
 
@@ -1630,7 +1641,62 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       editor.appendChild(bioLabel);
       editor.appendChild(el('p', 'profile-char-count', (bioInput.value.length) + '/160 characters'));
 
-      editor.appendChild(el('p', 'profile-image-help', 'Choose images directly from your computer. Animated GIF, APNG and WebP files keep their motion, with an instant preview.'));
+      var taglineField = field('One-line status', 'text', 'e.g. Always chasing the next great riff', 'off');
+      taglineField.input.required = false;
+      taglineField.input.maxLength = 60;
+      taglineField.input.value = profile.tagline || '';
+      editor.appendChild(taglineField.label);
+      editor.appendChild(el('p', 'profile-image-help', 'Add a short status, then personalise the colours and style of your player card.'));
+
+      var accentLabel = el('label', 'lb-field');
+      accentLabel.appendChild(el('span', null, 'Accent colour'));
+      var accentControls = el('div', 'profile-color-controls');
+      var accentInput = el('input', 'profile-color-input');
+      accentInput.type = 'color';
+      accentInput.value = safeProfileColor(profile.accent_color);
+      accentInput.setAttribute('aria-label', 'Choose a custom profile accent colour');
+      accentControls.appendChild(accentInput);
+      var swatches = el('div', 'profile-color-swatches');
+      ['#FF6B35', '#7C5CFC', '#22A699', '#E34C8C', '#D5A13C', '#4388E8'].forEach(function (color) {
+        var swatch = el('button', 'profile-color-swatch');
+        swatch.type = 'button';
+        swatch.style.backgroundColor = color;
+        swatch.title = color;
+        swatch.setAttribute('aria-label', 'Use accent colour ' + color);
+        swatch.addEventListener('click', function () { accentInput.value = color; updatePreview(); });
+        swatches.appendChild(swatch);
+      });
+      accentControls.appendChild(swatches);
+      accentLabel.appendChild(accentControls);
+      editor.appendChild(accentLabel);
+
+      function selectField(labelText, options, selectedValue) {
+        var label = el('label', 'lb-field');
+        label.appendChild(el('span', null, labelText));
+        var select = el('select', 'profile-select');
+        options.forEach(function (option) {
+          var item = el('option', null, option[1]);
+          item.value = option[0];
+          select.appendChild(item);
+        });
+        select.value = selectedValue;
+        label.appendChild(select);
+        return { label: label, input: select };
+      }
+      var appearanceFields = el('div', 'profile-style-fields');
+      var cardStyleField = selectField('Card theme', [
+        ['classic', 'Classic'], ['sunset', 'Sunset'], ['ocean', 'Ocean'], ['aurora', 'Aurora'], ['midnight', 'Midnight']
+      ], safeProfileChoice(profile.card_style, ['classic', 'sunset', 'ocean', 'aurora', 'midnight'], 'classic'));
+      var avatarShapeField = selectField('Avatar shape', [
+        ['circle', 'Circle'], ['rounded', 'Rounded'], ['square', 'Square']
+      ], safeProfileChoice(profile.avatar_shape, ['circle', 'rounded', 'square'], 'rounded'));
+      var effectField = selectField('Profile effect', [
+        ['none', 'None'], ['glow', 'Glow'], ['shimmer', 'Shimmer']
+      ], safeProfileChoice(profile.profile_effect, ['none', 'glow', 'shimmer'], 'none'));
+      appearanceFields.appendChild(cardStyleField.label);
+      appearanceFields.appendChild(avatarShapeField.label);
+      appearanceFields.appendChild(effectField.label);
+      editor.appendChild(appearanceFields);
 
       var compressionBox = el('div', 'profile-compression-status');
       compressionBox.hidden = true;
@@ -1697,6 +1763,13 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       function updatePreview() {
         previewText.querySelector('.profile-preview-name').textContent = usernameField.input.value.trim() || 'Your player name';
         previewBio.textContent = bioInput.value.trim() || 'Your bio will appear here. Tell the community a little about yourself.';
+        previewTagline.textContent = taglineField.input.value.trim() || 'Your one-line status will appear here.';
+        setProfileAppearance(preview, {
+          accent_color: accentInput.value,
+          card_style: cardStyleField.input.value,
+          profile_effect: effectField.input.value
+        });
+        avatarWrap.dataset.avatarShape = avatarShapeField.input.value;
         var avatarUrl = avatarPreviewSource;
         avatarImage.hidden = !avatarUrl;
         avatarFallback.hidden = Boolean(avatarUrl);
@@ -1797,6 +1870,11 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         editor.querySelector('.profile-char-count').textContent = bioInput.value.length + '/160 characters';
         updatePreview();
       });
+      taglineField.input.addEventListener('input', updatePreview);
+      accentInput.addEventListener('input', updatePreview);
+      cardStyleField.input.addEventListener('change', updatePreview);
+      avatarShapeField.input.addEventListener('change', updatePreview);
+      effectField.input.addEventListener('change', updatePreview);
       updatePreview();
 
       var saveMessage = el('p', 'lb-message');
@@ -1823,6 +1901,11 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           await saveProfileDetails({
             username: usernameField.input.value,
             bio: bioInput.value,
+            tagline: taglineField.input.value,
+            accentColor: accentInput.value,
+            cardStyle: cardStyleField.input.value,
+            avatarShape: avatarShapeField.input.value,
+            profileEffect: effectField.input.value,
             avatarData: avatarData,
             bannerData: bannerData
           });
@@ -1979,6 +2062,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       }
 
       var card = el('article', 'public-player-card');
+      setProfileAppearance(card, profile);
       var banner = el('div', 'public-player-banner');
       if (profile.banner_url) {
         var bannerImage = el('img');
@@ -1993,6 +2077,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var content = el('div', 'public-player-content');
       var identity = el('div', 'public-player-identity');
       var avatar = el('div', 'public-player-avatar');
+      avatar.dataset.avatarShape = safeProfileChoice(profile.avatar_shape, ['circle', 'rounded', 'square'], 'rounded');
       if (profile.avatar_url) {
         var avatarImage = el('img');
         avatarImage.src = profile.avatar_url;
@@ -2017,6 +2102,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       identity.appendChild(nameBlock);
       content.appendChild(identity);
 
+      if (String(profile.tagline || '').trim()) {
+        content.appendChild(el('p', 'public-player-tagline', String(profile.tagline).trim()));
+      }
       var bio = el('p', 'public-player-bio', String(profile.bio || '').trim() || 'This player has not added a bio yet.');
       content.appendChild(bio);
 
