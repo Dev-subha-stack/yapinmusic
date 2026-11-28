@@ -446,3 +446,60 @@ export function configureLeaderboardAdapter(nextAdapter) {
   }
   adapter = nextAdapter;
 }
+
+
+export async function getDecorations(page = 1) {
+  const cleanPage = Math.max(1, Math.min(100, Number(page) || 1));
+  return apiRequest('/api/decorations?page=' + cleanPage, { method: 'GET' }, false);
+}
+
+export async function submitCommunityDecoration({ name, imageData, originalArtAttested } = {}) {
+  return apiRequest('/api/decorations', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'submit', name, imageData, originalArtAttested: originalArtAttested === true })
+  });
+}
+
+export async function wearCommunityDecoration(decorationId) {
+  const result = await apiRequest('/api/decorations', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'wear', decorationId })
+  });
+  await getPlayerLeaderboardEntry().catch(() => null);
+  return result;
+}
+
+export async function removeCommunityDecoration() {
+  const result = await apiRequest('/api/decorations', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'unwear' })
+  });
+  await getPlayerLeaderboardEntry().catch(() => null);
+  return result;
+}
+
+export async function withdrawCommunityDecoration(decorationId) {
+  return apiRequest('/api/decorations', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'withdraw', decorationId })
+  });
+}
+
+export async function sendPresenceHeartbeat() {
+  return apiRequest('/api/presence', { method: 'POST', body: '{}' });
+}
+
+export async function getAdminAccess() {
+  return apiRequest('/api/admin?scope=access', { method: 'GET' });
+}
+
+export async function getAdminDashboard() {
+  return apiRequest('/api/admin', { method: 'GET' });
+}
+
+export async function moderateCommunityDecoration({ action, decorationId, reason, note } = {}) {
+  return apiRequest('/api/admin', {
+    method: 'POST',
+    body: JSON.stringify({ action, decorationId, reason, note })
+  });
+}

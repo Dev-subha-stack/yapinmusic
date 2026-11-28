@@ -2049,6 +2049,17 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
     var panel = root && $('[data-public-profile-panel]', root);
     var requestNumber = 0;
 
+    function appendAvatarDecoration(container, profile) {
+      if (!container || !profile || !profile.active_decoration_image) return;
+      var overlay = el('img', 'profile-decoration-overlay');
+      overlay.src = profile.active_decoration_image;
+      overlay.alt = '';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.draggable = false;
+      overlay.onerror = function () { overlay.remove(); };
+      container.appendChild(overlay);
+    }
+
     function initials(name) {
       return String(name || 'Y').trim().charAt(0).toUpperCase() || 'Y';
     }

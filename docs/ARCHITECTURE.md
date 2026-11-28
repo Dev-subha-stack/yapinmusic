@@ -13,3 +13,11 @@
 The intended direction is to keep UI/game controllers independent of the database provider. The leaderboard UI should call `src/services/leaderboard.js`; a provider adapter can then use Supabase or another backend. Authentication should expose a small session/profile service rather than scattering auth calls through the game code.
 
 The Supabase migration is only a proposed starting data model. Before public score submission is enabled, calculate/validate scores in a trusted server-side function, enforce one valid submission per daily puzzle where appropriate, and review RLS policies against the final product requirements.
+
+
+## Community decorations and presence
+
+- User-created avatar decorations are stored with their moderation state in `public.player_decorations`; only approved designs are returned in the public gallery or accepted by the wear action.
+- Admin APIs validate the authenticated user ID against the server-only `YAPIN_ADMIN_USER_IDS` allowlist. Do not add this variable to browser-exposed `VITE_*` configuration.
+- Signed-in clients heartbeat to `public.player_presence`; the admin dashboard counts as online accounts seen within the last five minutes.
+- Run `neon/migrations/20261128020000_community_decorations.sql` before deploying the API/UI changes.

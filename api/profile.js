@@ -38,7 +38,9 @@ function validImageData(value, maxLength) {
 
 async function readProfile(pool, userId) {
   const { rows } = await pool.query(
-    `select p.user_id, p.username, p.bio, p.tagline, p.avatar_url, p.banner_url,
+    `select p.user_id, p.username, p.bio,
+              p.active_decoration_id, d.name as active_decoration_name, d.image_data as active_decoration_image,
+            exists (select 1 from public.player_decorations ad where ad.creator_id = p.user_id and ad.status = 'approved') as artist_badge, p.tagline, p.avatar_url, p.banner_url,
             p.accent_color, p.card_style, p.avatar_shape, p.profile_effect,
             p.yapin_username,
             coalesce(l.total_points, 0)::integer as total_points,
@@ -47,6 +49,7 @@ async function readProfile(pool, userId) {
             l.rank_position
        from public.player_profiles p
        left join public.player_leaderboard l on l.user_id = p.user_id
+       left join public.player_decorations d on d.id = p.active_decoration_id and d.status = 'approved'
       where p.user_id = $1
       limit 1`,
     [userId]
