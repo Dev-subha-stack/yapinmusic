@@ -154,7 +154,7 @@ export function createDecorationsUI() {
   const root = document.getElementById('v-decorations');
   let accountState = getAccountState();
   let snapshot = null;
-  let activeTab = 'community';
+  let activeTab = 'included';
   let page = 1;
   let loading = false;
   let selectedFile = null;
@@ -228,6 +228,41 @@ export function createDecorationsUI() {
           if (!window.confirm('Take down "' + item.name + '"? Players wearing it will lose this decoration.')) return;
           try { await withdrawCommunityDecoration(item.id); await refresh(); }
           catch (error) { addNotice(root, error.message, true); }
+        }));
+      }
+      details.appendChild(actions);
+      card.appendChild(details);
+      grid.appendChild(card);
+    });
+    parent.appendChild(grid);
+  }
+
+  function renderIncluded(parent) {
+    const intro = el('p', 'community-included-intro', 'Ready-to-wear Yapin designs. No submission or approval needed — pick one and it appears around your avatar.');
+    parent.appendChild(intro);
+    const grid = el('div', 'community-decor-grid community-included-grid');
+    PRESET_DECORATIONS.forEach(function (item) {
+      const card = el('article', 'community-decor-card community-included-card');
+      renderDecorationImage(card, getBuiltInDecorationImage(item.id), item.name);
+      const details = el('div', 'community-decor-details');
+      details.appendChild(el('h3', null, item.name));
+      details.appendChild(el('p', 'community-decor-creator', item.subtitle));
+      details.appendChild(el('p', 'community-decor-meta', item.description));
+      const count = snapshot && snapshot.presetWearCounts ? Number(snapshot.presetWearCounts[item.id]) || 0 : 0;
+      details.appendChild(el('p', 'community-decor-meta', count.toLocaleString() + ' player' + (count === 1 ? '' : 's') + ' wearing'));
+      const actions = el('div', 'community-decor-actions');
+      const wearing = Boolean(snapshot && snapshot.activePresetDecoration === item.id);
+      if (!accountState.user) {
+        actions.appendChild(makeButton('Sign in to wear', 'btn primary', function () { location.hash = '#profile'; }));
+      } else if (wearing) {
+        actions.appendChild(makeButton('Wearing · Remove', 'btn', async function () {
+          try { await removeCommunityDecoration(); await refresh(); }
+          catch (error) { addNotice(root, error.message || 'Could not remove the decoration.', true); }
+        }));
+      } else {
+        actions.appendChild(makeButton('Wear decoration', 'btn primary', async function () {
+          try { await wearPresetDecoration(item.id); await refresh(); }
+          catch (error) { addNotice(root, error.message || 'Could not apply the decoration.', true); }
         }));
       }
       details.appendChild(actions);
@@ -416,6 +451,7 @@ export function createDecorationsUI() {
 
     const tabs = el('div', 'community-tabs');
     [
+      ['included', 'Included'],
       ['community', 'Community'],
       ['mine', 'My decorations'],
       ['make', 'Make a decoration']
@@ -431,7 +467,9 @@ export function createDecorationsUI() {
 
     const content = el('section', 'community-content');
     if (loading && !snapshot) {
-      addNotice(content, 'Loading community decorations…');
+      addNotice(content, 'Loading decorations…');
+    } else if (activeTab === 'included') {
+      renderIncluded(content);
     } else if (activeTab === 'community') {
       renderCommunity(content);
     } else if (activeTab === 'mine') {

@@ -145,7 +145,7 @@ export default async function handler(req, res) {
 
       const profileResult = await client.query(
         `select p.user_id, p.username, p.bio,
-              p.active_decoration_id, d.name as active_decoration_name, d.image_data as active_decoration_image,
+              p.active_decoration_id, p.active_preset_decoration, d.name as active_decoration_name, d.image_data as active_decoration_image,
             exists (select 1 from public.player_decorations ad where ad.creator_id = p.user_id and ad.status = 'approved') as artist_badge, p.avatar_url, p.banner_url,
                 coalesce(l.total_points, 0)::integer as total_points,
                 coalesce(l.wins, 0)::integer as wins,

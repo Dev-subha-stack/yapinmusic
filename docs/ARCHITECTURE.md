@@ -28,3 +28,11 @@ The Supabase migration is only a proposed starting data model. Before public sco
 - Admin roles are stored in `public.yapin_admins`, keyed to Neon Auth user IDs. The migration seeds `romendraroy4@gmail.com` as the protected owner.
 - Only the owner can grant or revoke admin roles. New admins must already have a Yapin Music account; they are selected by their account email.
 - Admin role checks happen in server-side API handlers. Never rely on the hidden Admin navigation link as an authorization boundary.
+
+
+## Built-in avatar decorations
+
+- Six included SVG decorations are defined in `src/decorations.js` and exposed in the Included gallery tab. They are app-provided designs and do not enter community moderation.
+- The selected preset ID is stored in `player_profiles.active_preset_decoration`; API actions validate IDs against the fixed server-side allowlist.
+- Only one decoration can be active at a time. Wearing a community design clears the preset, and wearing a preset clears the community decoration.
+- Apply `neon/migrations/20261128040000_builtin_avatar_decorations.sql` before deploying these changes.

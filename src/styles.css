@@ -2042,3 +2042,128 @@ body.player-profile-open { overflow:hidden; }
     opacity:.12;
   }
 }
+
+
+/* ===== Header overflow fix: keep the brand, nav and profile controls in separate grid tracks ===== */
+@media (min-width: 1371px) {
+  .site-head .wrap.top {
+    width: min(calc(100% - 64px), 1760px);
+    max-width: 1760px;
+    display: grid;
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) 96px;
+    align-items: center;
+    gap: 12px 16px;
+    box-sizing: border-box;
+  }
+
+  .site-head .brand {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+    gap: 11px;
+    white-space: nowrap;
+  }
+
+  .site-head .brand span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .site-head nav#main-navigation {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1px;
+    overflow: hidden;
+  }
+
+  .site-head nav#main-navigation a {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-inline: clamp(4px, .52vw, 10px);
+    font-size: clamp(.75rem, .8vw, .9rem);
+    letter-spacing: -.025em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .site-head .head-actions {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    min-width: 0;
+  }
+}
+
+/* Give medium desktop widths a dedicated navigation row instead of letting it collide with the logo. */
+@media (min-width: 701px) and (max-width: 1370px) {
+  .site-head .wrap.top {
+    width: min(calc(100% - 40px), 1280px);
+    max-width: 1280px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px 16px;
+    box-sizing: border-box;
+  }
+
+  .site-head .brand {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .site-head .head-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .site-head nav#main-navigation {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow: visible;
+    border-radius: 22px;
+  }
+}
+
+/* Built-in decoration gallery */
+.community-included-intro {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.community-included-card {
+  align-items: center;
+  background:
+    radial-gradient(ellipse at 15% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 65%),
+    var(--surface);
+}
+.community-included-card .community-decor-image-frame {
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 12%, var(--hover)) 0%, var(--hover) 72%);
+}
+.community-included-card .community-decor-details h3 {
+  letter-spacing: -.02em;
+}
+.community-included-card .community-decor-creator {
+  color: var(--accent);
+  font-weight: 700;
+}

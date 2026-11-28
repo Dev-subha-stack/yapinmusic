@@ -1593,6 +1593,9 @@ import { createDecorationsUI, createAdminUI, initPresenceAndAdminLink } from '..
       identity.appendChild(avatarWrap);
       var previewText = el('div', 'profile-preview-text');
       previewText.appendChild(el('strong', 'profile-preview-name', profile.username || accountState.user.name || 'Your player name'));
+      var decorationShortcut = el('a', 'profile-decoration-inline-link', 'Choose an avatar decoration');
+      decorationShortcut.href = '#decorations';
+      previewText.appendChild(decorationShortcut);
       if (profile.artist_badge) previewText.appendChild(el('span', 'artist-badge', '✦ Artist'));
       previewText.appendChild(el('span', 'profile-preview-rank', (profile.rank_position ? '#' + profile.rank_position + ' · ' : '') + rankFor(profile.total_points || 0).name));
       identity.appendChild(previewText);

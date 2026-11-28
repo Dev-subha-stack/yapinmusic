@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   try {
     const pool = getPool();
     const profileSql = [
-      'select p.user_id, p.username, p.bio, p.active_decoration_id,',
+      'select p.user_id, p.username, p.bio, p.active_decoration_id, p.active_preset_decoration,',
       'd.name as active_decoration_name, d.image_data as active_decoration_image,',
       "exists (select 1 from public.player_decorations ad where ad.creator_id = p.user_id and ad.status = 'approved') as artist_badge,",
       'p.tagline, p.avatar_url, p.banner_url, p.accent_color, p.card_style, p.avatar_shape, p.profile_effect,',

@@ -470,6 +470,15 @@ export async function wearCommunityDecoration(decorationId) {
   return result;
 }
 
+export async function wearPresetDecoration(presetId) {
+  const result = await apiRequest('/api/decorations', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'wear-preset', presetId })
+  });
+  await getPlayerLeaderboardEntry().catch(() => null);
+  return result;
+}
+
 export async function removeCommunityDecoration() {
   const result = await apiRequest('/api/decorations', {
     method: 'POST',

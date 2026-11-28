@@ -3,6 +3,7 @@ import { requireNeonUser, sendApiError } from './_lib/auth.js';
 
 const PAGE_SIZE = 12;
 const MAX_IMAGE_LENGTH = 360000;
+const PRESET_DECORATION_IDS = new Set(['neon-orbit', 'ember-ring', 'starlight', 'sakura-bloom', 'frostline', 'emerald-leaves']);
 
 function badRequest(message) {
   const error = new Error(message);
@@ -24,13 +25,14 @@ function validImageData(value) {
 async function readSummary(pool, userId) {
   if (!userId) return { activeDecorationId: null, artistBadge: false, pendingCount: 0, submissionLimit: 3 };
   const result = await pool.query(
-    'select p.active_decoration_id, exists (select 1 from public.player_decorations d where d.creator_id = p.user_id and d.status = $2) as artist_badge, (select count(*)::integer from public.player_decorations d where d.creator_id = p.user_id and d.status = $3) as pending_count from public.player_profiles p where p.user_id = $1 limit 1',
+    'select p.active_decoration_id, p.active_preset_decoration, exists (select 1 from public.player_decorations d where d.creator_id = p.user_id and d.status = $2) as artist_badge, (select count(*)::integer from public.player_decorations d where d.creator_id = p.user_id and d.status = $3) as pending_count from public.player_profiles p where p.user_id = $1 limit 1',
     [userId, 'approved', 'pending']
   );
   const row = result.rows[0] || {};
   const artistBadge = Boolean(row.artist_badge);
   return {
     activeDecorationId: row.active_decoration_id || null,
+    activePresetDecoration: row.active_preset_decoration || null,
     artistBadge,
     pendingCount: Number(row.pending_count) || 0,
     submissionLimit: artistBadge ? 6 : 3
@@ -44,6 +46,16 @@ async function readCommunity(pool, userId, page) {
     [userId, 'approved', PAGE_SIZE + 1, offset]
   );
   return { items: result.rows.slice(0, PAGE_SIZE), hasMore: result.rows.length > PAGE_SIZE };
+}
+
+async function readPresetWearCounts(pool) {
+  const result = await pool.query(
+    'select active_preset_decoration as id, count(*)::integer as wearer_count from public.player_profiles where active_preset_decoration is not null group by active_preset_decoration'
+  );
+  return result.rows.reduce((counts, row) => {
+    counts[row.id] = Number(row.wearer_count) || 0;
+    return counts;
+  }, {});
 }
 
 async function readMine(pool, userId) {
@@ -71,14 +83,16 @@ export default async function handler(req, res) {
       const results = await Promise.all([
         readCommunity(pool, userId, page),
         readMine(pool, userId),
-        readSummary(pool, userId)
+        readSummary(pool, userId),
+        readPresetWearCounts(pool)
       ]);
       return res.status(200).json({
         community: results[0].items,
         hasMore: results[0].hasMore,
         page,
         mine: results[1],
-        ...results[2]
+        ...results[2],
+        presetWearCounts: results[3]
       });
     } catch (error) {
       return sendApiError(res, error);
@@ -141,19 +155,29 @@ export default async function handler(req, res) {
       const decorationId = String(body.decorationId || '');
       if (!validUuid(decorationId)) throw badRequest('Choose a valid decoration.');
       const result = await pool.query(
-        'update public.player_profiles p set active_decoration_id = d.id, updated_at = now() from public.player_decorations d where p.user_id = $1 and d.id = $2 and d.status = $3 returning p.active_decoration_id',
+        'update public.player_profiles p set active_decoration_id = d.id, active_preset_decoration = null, updated_at = now() from public.player_decorations d where p.user_id = $1 and d.id = $2 and d.status = $3 returning p.active_decoration_id',
         [userId, decorationId, 'approved']
       );
       if (!result.rowCount) throw badRequest('That decoration is no longer available.');
       return res.status(200).json({ activeDecorationId: result.rows[0].active_decoration_id });
     }
 
+    if (action === 'wear-preset') {
+      const presetId = String(body.presetId || '').trim();
+      if (!PRESET_DECORATION_IDS.has(presetId)) throw badRequest('Choose a valid included decoration.');
+      await pool.query(
+        'update public.player_profiles set active_decoration_id = null, active_preset_decoration = $2, updated_at = now() where user_id = $1',
+        [userId, presetId]
+      );
+      return res.status(200).json({ activeDecorationId: null, activePresetDecoration: presetId });
+    }
+
     if (action === 'unwear') {
       await pool.query(
-        'update public.player_profiles set active_decoration_id = null, updated_at = now() where user_id = $1',
+        'update public.player_profiles set active_decoration_id = null, active_preset_decoration = null, updated_at = now() where user_id = $1',
         [userId]
       );
-      return res.status(200).json({ activeDecorationId: null });
+      return res.status(200).json({ activeDecorationId: null, activePresetDecoration: null });
     }
 
     if (action === 'withdraw') {

@@ -415,3 +415,29 @@
   .admin-add-form { grid-template-columns: minmax(0, 1fr); }
   .admin-manager-row { align-items: flex-start; flex-direction: column; }
 }
+
+.profile-decoration-inline-link {
+  width: fit-content;
+  color: var(--accent);
+  font-size: .82rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+.profile-decoration-inline-link:hover { text-decoration: underline; }
+.community-included-intro {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.community-included-card {
+  align-items: center;
+  background:
+    radial-gradient(ellipse at 15% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 65%),
+    var(--surface);
+}
+.community-included-card .community-decor-image-frame {
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 12%, var(--hover)) 0%, var(--hover) 72%);
+}
+.community-included-card .community-decor-details h3 { letter-spacing: -.02em; }
+.community-included-card .community-decor-creator { color: var(--accent); font-weight: 700; }
