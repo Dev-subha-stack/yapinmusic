@@ -24,7 +24,7 @@ function validImageData(value, maxLength) {
 async function readProfile(pool, userId) {
   const { rows } = await pool.query(
     `select p.user_id, p.username, p.bio, p.avatar_url, p.banner_url,
-            p.yapin_username, p.yapin_display_name, p.yapin_verified_at,
+            p.yapin_username,
             coalesce(l.total_points, 0)::integer as total_points,
             coalesce(l.wins, 0)::integer as wins,
             coalesce(l.games_played, 0)::integer as games_played,
