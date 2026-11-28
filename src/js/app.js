@@ -3,7 +3,7 @@ import { TEAM } from '../data/team.js';
 import { searchBandInfo, searchSongInfo } from '../services/music-info.js';
 import { storage as ls } from '../services/storage.js';
 import {
-  getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername, saveProfileDetails, saveMusicProfile,
+  getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername, saveProfileDetails,
   getLeaderboard, getPublicProfile, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured,
   getDailyTasks, claimDailyReward
 } from '../services/leaderboard.js';
@@ -1813,108 +1813,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       summary.appendChild(editor);
       profileBox.appendChild(summary);
 
-      // Manually curated music details; this feature does not connect to Spotify or read account data.
-      var musicProfile = profile.music_profile || {};
-      var recentTrack = musicProfile.recentTrack || {};
-      var musicEditor = el('form', 'profile-music-editor');
-      musicEditor.appendChild(el('div', 'profile-editor-heading', 'MY MUSIC'));
-      musicEditor.appendChild(el('p', 'profile-music-help', 'Add your recent listen, favourite songs and playlists manually. Paste Spotify share links; links open in Spotify. No Spotify sign-in or listening-history access is used.'));
-      musicEditor.appendChild(el('strong', 'profile-music-subheading', 'Last listened · update manually'));
-      var recentTitle = field('Song title', 'text', 'e.g. Blinding Lights', 'off');
-      recentTitle.input.maxLength = 100;
-      recentTitle.input.value = recentTrack.title || '';
-      musicEditor.appendChild(recentTitle.label);
-      var recentArtist = field('Artist', 'text', 'e.g. The Weeknd', 'off');
-      recentArtist.input.maxLength = 100;
-      recentArtist.input.value = recentTrack.artist || '';
-      musicEditor.appendChild(recentArtist.label);
-      var recentUrl = field('Spotify song link', 'url', 'https://open.spotify.com/track/...', 'url');
-      recentUrl.input.value = recentTrack.url || '';
-      musicEditor.appendChild(recentUrl.label);
-
-      var favoriteTracksLabel = el('label', 'lb-field');
-      favoriteTracksLabel.appendChild(el('span', null, 'Favourite songs · up to 5'));
-      var favoriteTracksInput = el('textarea', 'profile-bio-input');
-      favoriteTracksInput.rows = 4;
-      favoriteTracksInput.maxLength = 1800;
-      favoriteTracksInput.placeholder = 'Song title | Artist | Spotify track link';
-      favoriteTracksInput.value = (musicProfile.favoriteTracks || []).map(function (track) {
-        return [track.title, track.artist, track.url].join(' | ');
-      }).join('\n');
-      favoriteTracksLabel.appendChild(favoriteTracksInput);
-      musicEditor.appendChild(favoriteTracksLabel);
-
-      var playlistsLabel = el('label', 'lb-field');
-      playlistsLabel.appendChild(el('span', null, 'Favourite playlists · up to 5'));
-      var playlistsInput = el('textarea', 'profile-bio-input');
-      playlistsInput.rows = 4;
-      playlistsInput.maxLength = 1800;
-      playlistsInput.placeholder = 'Playlist name | Spotify playlist link';
-      playlistsInput.value = (musicProfile.playlists || []).map(function (playlist) {
-        return [playlist.title, playlist.url].join(' | ');
-      }).join('\n');
-      playlistsLabel.appendChild(playlistsInput);
-      musicEditor.appendChild(playlistsLabel);
-
-      var musicVisibility = el('label', 'profile-music-visibility');
-      var musicVisibilityInput = el('input');
-      musicVisibilityInput.type = 'checkbox';
-      musicVisibilityInput.checked = Boolean(profile.music_is_public);
-      musicVisibility.appendChild(musicVisibilityInput);
-      musicVisibility.appendChild(el('span', null, 'Show My Music on my public player profile'));
-      musicEditor.appendChild(musicVisibility);
-
-      var musicMessage = el('p', 'lb-message');
-      musicEditor.appendChild(musicMessage);
-      var musicActions = el('div', 'profile-editor-actions');
-      var musicSave = el('button', 'btn primary', 'Save My Music');
-      musicSave.type = 'submit';
-      musicActions.appendChild(musicSave);
-      musicEditor.appendChild(musicActions);
-
-      function parseMusicLines(value, withArtist) {
-        return String(value || '').split('\n').map(function (line) {
-          return line.trim();
-        }).filter(Boolean).map(function (line) {
-          var parts = line.split('|').map(function (part) { return part.trim(); });
-          return withArtist
-            ? { title: parts[0] || '', artist: parts[1] || '', url: parts[2] || '' }
-            : { title: parts[0] || '', url: parts[1] || '' };
-        });
-      }
-
-      musicEditor.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        var recentHasAny = [recentTitle.input.value, recentArtist.input.value, recentUrl.input.value].some(function (value) { return value.trim(); });
-        var recentValue = recentHasAny ? {
-          title: recentTitle.input.value.trim(),
-          artist: recentArtist.input.value.trim(),
-          url: recentUrl.input.value.trim()
-        } : null;
-        var favorites = parseMusicLines(favoriteTracksInput.value, true);
-        var playlists = parseMusicLines(playlistsInput.value, false);
-        if (favorites.length > 5 || playlists.length > 5) {
-          setMessage(musicMessage, 'Add no more than 5 favourite songs and 5 playlists.', true);
-          return;
-        }
-        musicSave.disabled = true;
-        setMessage(musicMessage, 'Saving your music profile…', false);
-        try {
-          await saveMusicProfile({
-            recentTrack: recentValue,
-            favoriteTracks: favorites,
-            playlists: playlists
-          }, musicVisibilityInput.checked);
-          setMessage(musicMessage, 'Your music profile has been saved.', false);
-          toast('My Music updated!');
-        } catch (error) {
-          setMessage(musicMessage, error.message || 'Could not save your music profile.', true);
-        } finally {
-          musicSave.disabled = false;
-        }
-      });
-      profileBox.appendChild(musicEditor);
-
       var accountActions = el('div', 'profile-account-actions');
       var emailNote = el('p', 'lb-muted', accountState.user.email || 'Signed-in player');
       accountActions.appendChild(emailNote);
@@ -2100,61 +1998,6 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         stats.appendChild(block);
       });
       content.appendChild(stats);
-
-      var sharedMusic = profile.music_profile;
-      if (sharedMusic && (sharedMusic.recentTrack || (sharedMusic.favoriteTracks || []).length || (sharedMusic.playlists || []).length)) {
-        function makeSpotifyLink(url) {
-          try {
-            var parsed = new URL(String(url || ''));
-            if (parsed.protocol !== 'https:' || parsed.hostname !== 'open.spotify.com') return null;
-            if (!/^\/(?:track|playlist)\\/[A-Za-z0-9]+\\/?$/.test(parsed.pathname)) return null;
-            return parsed.origin + parsed.pathname.replace(/\/$/, '');
-          } catch (error) { return null; }
-        }
-        function appendMusicItem(parent, title, subtitle, url, linkLabel) {
-          var safeLink = makeSpotifyLink(url);
-          if (!safeLink) return;
-          var item = el('div', 'public-music-item');
-          var textBlock = el('div', 'public-music-copy');
-          textBlock.appendChild(el('strong', null, title || 'Untitled'));
-          if (subtitle) textBlock.appendChild(el('span', null, subtitle));
-          item.appendChild(textBlock);
-          var link = el('a', 'public-music-link', linkLabel || 'Open in Spotify');
-          link.href = safeLink;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          item.appendChild(link);
-          parent.appendChild(item);
-        }
-        var musicSection = el('section', 'public-player-music');
-        var musicHeader = el('div', 'public-player-music-header');
-        musicHeader.appendChild(el('div', 'public-player-music-kicker', 'PLAYER PICKS'));
-        musicHeader.appendChild(el('h3', null, 'My Music'));
-        musicSection.appendChild(musicHeader);
-        if (sharedMusic.recentTrack) {
-          var recentSection = el('div', 'public-music-group');
-          recentSection.appendChild(el('p', 'public-music-label', 'Last listened · manually updated'));
-          appendMusicItem(recentSection, sharedMusic.recentTrack.title, sharedMusic.recentTrack.artist, sharedMusic.recentTrack.url);
-          if (recentSection.children.length > 1) musicSection.appendChild(recentSection);
-        }
-        if ((sharedMusic.favoriteTracks || []).length) {
-          var favoriteSection = el('div', 'public-music-group');
-          favoriteSection.appendChild(el('p', 'public-music-label', 'Favourite songs'));
-          (sharedMusic.favoriteTracks || []).forEach(function (track) {
-            appendMusicItem(favoriteSection, track.title, track.artist, track.url);
-          });
-          if (favoriteSection.children.length > 1) musicSection.appendChild(favoriteSection);
-        }
-        if ((sharedMusic.playlists || []).length) {
-          var playlistSection = el('div', 'public-music-group');
-          playlistSection.appendChild(el('p', 'public-music-label', 'Favourite playlists'));
-          (sharedMusic.playlists || []).forEach(function (playlist) {
-            appendMusicItem(playlistSection, playlist.title, '', playlist.url, 'View playlist');
-          });
-          if (playlistSection.children.length > 1) musicSection.appendChild(playlistSection);
-        }
-        if (musicSection.children.length > 1) content.appendChild(musicSection);
-      }
 
       card.appendChild(content);
       panel.appendChild(card);
