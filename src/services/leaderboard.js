@@ -225,6 +225,22 @@ export async function saveProfileDetails({ username, bio = '', avatarData = null
   return currentProfile;
 }
 
+export async function saveMusicProfile(musicProfile, isPublic) {
+  if (!authClient || !currentSession) throw new Error('Sign in before editing your music profile.');
+  const result = await apiRequest('/api/music-profile', {
+    method: 'POST',
+    body: JSON.stringify({ musicProfile, isPublic: Boolean(isPublic) })
+  });
+  if (currentProfile) {
+    currentProfile = {
+      ...currentProfile,
+      music_profile: result.musicProfile,
+      music_is_public: result.isPublic
+    };
+  }
+  return result;
+}
+
 export async function saveUsername(value) {
   return saveProfileDetails({
     username: value,
