@@ -593,3 +593,15 @@
   z-index: 4 !important;
   pointer-events: none;
 }
+
+.lb-row-avatar > img.profile-decoration-overlay {
+  position: absolute !important;
+  inset: -15% !important;
+  width: 130% !important;
+  height: 130% !important;
+  max-width: none !important;
+  object-fit: contain !important;
+  border-radius: 0 !important;
+  z-index: 4 !important;
+  pointer-events: none;
+}
