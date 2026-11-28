@@ -1802,78 +1802,35 @@ body.player-profile-open { overflow:hidden; }
 }
 
 
-/* ===== Yapin account verification ===== */
-.yapin-verification-card {
-  display: grid;
-  justify-items: start;
-  gap: 8px;
-  margin: 0 18px 18px;
-  padding: 15px;
-  border: 1px solid var(--line);
-  border-radius: 15px;
+/* ===== Alternative Yapin login option ===== */
+.yapin-login-button {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--accent);
   background: var(--surface);
-}
-.yapin-verification-kicker {
-  color: var(--accent);
-  font-size: .66rem;
-  font-weight: 900;
-  letter-spacing: .13em;
-}
-.yapin-verification-title {
   color: var(--fg);
-  font: 800 1.05rem var(--f-display);
+  font-weight: 800;
+  letter-spacing: -.01em;
 }
-.yapin-verification-description {
-  color: var(--muted);
-  font-size: .86rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
+.yapin-login-button:hover {
+  background: var(--hover);
+  border-color: var(--accent);
+  transform: translateY(-1px);
 }
-.yapin-verified-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 4px 8px;
-  border: 1px solid rgba(35,129,63,.28);
-  border-radius: 999px;
-  background: rgba(35,129,63,.1);
-  color: #23813F;
-  font: 800 .7rem/1.2 var(--f-body);
-  white-space: nowrap;
-}
-.yapin-verified-badge-small {
-  margin-top: 3px;
-  font-size: .63rem;
-  padding: 3px 7px;
-}
-.yapin-name-row {
+.yapin-login-divider {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.yapin-name-row h2 { min-width: 0; }
-.yapin-provider-name {
+  gap: 12px;
   color: var(--muted);
-  font-size: .78rem;
-  font-weight: 700;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  white-space: nowrap;
 }
-:root[data-theme="dark"] .yapin-verified-badge {
-  border-color: rgba(97,211,142,.3);
-  background: rgba(97,211,142,.12);
-  color: #75D99D;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .yapin-verified-badge {
-    border-color: rgba(97,211,142,.3);
-    background: rgba(97,211,142,.12);
-    color: #75D99D;
-  }
-}
-@media (max-width: 480px) {
-  .yapin-verification-card { margin-inline: 13px; padding: 13px; }
-  .yapin-name-row { align-items: flex-start; }
+.yapin-login-divider::before,
+.yapin-login-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
 }
