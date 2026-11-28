@@ -10,6 +10,7 @@ import {
 import { compressMediaFile, formatMediaBytes } from '../mediaCompressor.js';
 import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 import { createDecorationsUI, createAdminUI, initPresenceAndAdminLink } from '../decorations.js';
+import { getBuiltInDecorationImage } from '../lib/built-in-decorations.js';
 
 (function () {
   'use strict';
@@ -1395,9 +1396,14 @@ import { createDecorationsUI, createAdminUI, initPresenceAndAdminLink } from '..
     }
 
     function appendAvatarDecoration(container, profile) {
-      if (!container || !profile || !profile.active_decoration_image) return;
+      if (!container || !profile) return;
+      var presetImage = profile.active_preset_decoration
+        ? getBuiltInDecorationImage(profile.active_preset_decoration)
+        : '';
+      var imageSource = profile.active_decoration_image || presetImage;
+      if (!imageSource) return;
       var overlay = el('img', 'profile-decoration-overlay');
-      overlay.src = profile.active_decoration_image;
+      overlay.src = imageSource;
       overlay.alt = '';
       overlay.setAttribute('aria-hidden', 'true');
       overlay.draggable = false;
@@ -2071,9 +2077,14 @@ import { createDecorationsUI, createAdminUI, initPresenceAndAdminLink } from '..
     var requestNumber = 0;
 
     function appendAvatarDecoration(container, profile) {
-      if (!container || !profile || !profile.active_decoration_image) return;
+      if (!container || !profile) return;
+      var presetImage = profile.active_preset_decoration
+        ? getBuiltInDecorationImage(profile.active_preset_decoration)
+        : '';
+      var imageSource = profile.active_decoration_image || presetImage;
+      if (!imageSource) return;
       var overlay = el('img', 'profile-decoration-overlay');
-      overlay.src = profile.active_decoration_image;
+      overlay.src = imageSource;
       overlay.alt = '';
       overlay.setAttribute('aria-hidden', 'true');
       overlay.draggable = false;

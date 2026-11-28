@@ -14,6 +14,7 @@ import {
   removeYapinAdmin,
   moderateCommunityDecoration
 } from './services/leaderboard.js';
+import { PRESET_DECORATIONS, getBuiltInDecorationImage } from './lib/built-in-decorations.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
