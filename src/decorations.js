@@ -9,6 +9,9 @@ import {
   sendPresenceHeartbeat,
   getAdminAccess,
   getAdminDashboard,
+  getYapinAdmins,
+  grantYapinAdmin,
+  removeYapinAdmin,
   moderateCommunityDecoration
 } from './services/leaderboard.js';
 
@@ -491,9 +494,85 @@ export function createAdminUI() {
   const root = document.getElementById('v-admin');
   let initialized = false;
   let loading = false;
+  let currentSnapshot = null;
+  let adminUsers = [];
+  let adminNotice = '';
+
+  function renderAdminManagement(parent) {
+    if (!currentSnapshot || currentSnapshot.adminRole !== 'owner') return;
+    const section = el('section', 'admin-managers');
+    section.appendChild(el('h2', 'admin-section-title', 'Administrator management'));
+    section.appendChild(el('p', 'admin-managers-note', 'Owner access only. Add an existing Yapin Music account by email, or revoke an administrator below. The owner account is protected.'));
+    const form = el('form', 'admin-add-form');
+    const email = el('input', 'admin-add-email');
+    email.type = 'email';
+    email.required = true;
+    email.maxLength = 254;
+    email.placeholder = 'user@example.com';
+    email.setAttribute('aria-label', 'Email address of the account to make admin');
+    const submit = el('button', 'btn primary', 'Make admin');
+    submit.type = 'submit';
+    form.appendChild(email);
+    form.appendChild(submit);
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      if (!email.value.trim() || submit.disabled) return;
+      submit.disabled = true;
+      submit.textContent = 'Adding…';
+      adminNotice = '';
+      try {
+        const result = await grantYapinAdmin(email.value.trim());
+        if (result.admin && result.admin.alreadyOwner) {
+          adminNotice = 'That account is already the protected owner.';
+        } else {
+          adminNotice = 'Admin access granted to ' + (result.admin.email || email.value.trim()) + '.';
+        }
+        await refresh();
+      } catch (error) {
+        adminNotice = error.message || 'Could not grant admin access.';
+        render(currentSnapshot, '');
+      } finally {
+        submit.disabled = false;
+        submit.textContent = 'Make admin';
+      }
+    });
+    section.appendChild(form);
+    if (adminNotice) addNotice(section, adminNotice, /could not|no account|valid email|only the/i.test(adminNotice));
+
+    const list = el('div', 'admin-manager-list');
+    if (!adminUsers.length) {
+      list.appendChild(el('div', 'community-empty', 'No administrator accounts were returned.'));
+    }
+    adminUsers.forEach(function (admin) {
+      const row = el('article', 'admin-manager-row');
+      const identity = el('div', 'admin-manager-identity');
+      identity.appendChild(el('strong', null, admin.name || admin.email || 'Yapin user'));
+      identity.appendChild(el('span', null, admin.email || 'No email'));
+      const role = el('span', 'admin-role-pill role-' + admin.role, admin.role === 'owner' ? 'Owner' : 'Admin');
+      identity.appendChild(role);
+      row.appendChild(identity);
+      if (admin.role !== 'owner') {
+        row.appendChild(makeButton('Revoke admin', 'btn community-danger', async function () {
+          if (!window.confirm('Remove admin access from ' + (admin.email || admin.name) + '?')) return;
+          try {
+            await removeYapinAdmin(admin.userId);
+            adminNotice = 'Admin access removed from ' + (admin.email || admin.name) + '.';
+            await refresh();
+          } catch (error) {
+            adminNotice = error.message || 'Could not remove admin access.';
+            render(currentSnapshot, '');
+          }
+        }));
+      }
+      list.appendChild(row);
+    });
+    section.appendChild(list);
+    parent.appendChild(section);
+  }
 
   function render(snapshot, error) {
     if (!root) return;
+    if (snapshot) currentSnapshot = snapshot;
     root.replaceChildren();
     const page = el('div', 'admin-page');
     const head = el('div', 'community-page-head');
@@ -530,6 +609,8 @@ export function createAdminUI() {
       stats.appendChild(card);
     });
     page.appendChild(stats);
+
+    renderAdminManagement(page);
 
     page.appendChild(el('h2', 'admin-section-title', 'Decoration approval queue'));
     const queue = Array.isArray(snapshot.pending) ? snapshot.pending : [];
@@ -592,7 +673,7 @@ export function createAdminUI() {
       await moderateCommunityDecoration({ decorationId, action, reason, note });
       await refresh();
     } catch (error) {
-      render(null, error.message || 'Could not update this submission.');
+      render(currentSnapshot, error.message || 'Could not update this submission.');
     }
   }
 
@@ -602,6 +683,13 @@ export function createAdminUI() {
     render(null, '');
     try {
       const snapshot = await getAdminDashboard();
+      if (snapshot.adminRole === 'owner') {
+        const result = await getYapinAdmins();
+        adminUsers = result.admins || [];
+      } else {
+        adminUsers = [];
+      }
+      currentSnapshot = snapshot;
       render(snapshot, '');
     } catch (error) {
       render(null, error.message || 'Could not load the admin dashboard.');

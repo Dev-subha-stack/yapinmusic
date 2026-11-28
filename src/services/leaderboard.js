@@ -504,3 +504,22 @@ export async function moderateCommunityDecoration({ action, decorationId, reason
     body: JSON.stringify({ action, decorationId, reason, note })
   });
 }
+
+
+export async function getYapinAdmins() {
+  return apiRequest('/api/admin?scope=admins', { method: 'GET' });
+}
+
+export async function grantYapinAdmin(email) {
+  return apiRequest('/api/admin', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'grant-admin', email })
+  });
+}
+
+export async function removeYapinAdmin(userId) {
+  return apiRequest('/api/admin', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'remove-admin', userId })
+  });
+}

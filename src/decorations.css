@@ -344,3 +344,74 @@
 .public-player-creation > strong { overflow-wrap: anywhere; }
 .public-player-creation > small { color: var(--muted); }
 .public-player-creation .btn { min-height: 36px; padding: 7px 10px; font-size: .82rem; }
+
+.admin-managers {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.admin-managers-note { margin: 0; color: var(--muted); line-height: 1.5; }
+.admin-add-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+.admin-add-email {
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--fg);
+  background: var(--bg);
+  font: 500 .95rem var(--f-body, sans-serif);
+}
+.admin-manager-list { display: grid; gap: 8px; }
+.admin-manager-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+}
+.admin-manager-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 10px;
+  min-width: 0;
+}
+.admin-manager-identity strong { overflow-wrap: anywhere; }
+.admin-manager-identity > span:not(.admin-role-pill) {
+  color: var(--muted);
+  font-size: .88rem;
+  overflow-wrap: anywhere;
+}
+.admin-role-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.admin-role-pill.role-owner {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.admin-manager-row .btn { min-height: 36px; padding: 7px 11px; font-size: .82rem; }
+@media (max-width: 560px) {
+  .admin-add-form { grid-template-columns: minmax(0, 1fr); }
+  .admin-manager-row { align-items: flex-start; flex-direction: column; }
+}
