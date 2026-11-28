@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test",
-    "check": "node --check src/js/app.js && node --check src/services/leaderboard.js && node --check api/_lib/auth.js && node --check api/_lib/db.js && node --check api/leaderboard.js && node --check api/profile.js && node --check api/public-profile.js && node --check api/tasks.js && node --check src/lib/missions.js && node --check api/submit-score.js && node --check api/yapin/start.js && node --check api/yapin/complete.js && node --check api/yapin/unlink.js"
+    "check": "node --check src/js/app.js && node --check src/services/leaderboard.js && node --check api/_lib/auth.js && node --check api/_lib/db.js && node --check api/leaderboard.js && node --check api/profile.js && node --check api/public-profile.js && node --check api/tasks.js && node --check src/lib/missions.js && node --check api/submit-score.js && node --check api/yapin/start.js && node --check api/yapin/complete.js && node --check api/yapin/session.js && node --check api/yapin/logout.js"
   },
   "devDependencies": {
     "vite": "^6.0.0"
