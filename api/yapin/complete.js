@@ -30,8 +30,8 @@ function profileUsername(username, stableHash) {
     .replace(/[^\p{L}\p{N}_. -]/gu, '')
     .trim()
     .replace(/\s+/g, ' ');
-  const base = Array.from(cleaned || 'Yapin').slice(0, 17).join('');
-  return base + '-' + stableHash.slice(0, 6);
+  const base = Array.from(cleaned || 'Yapin').slice(0, 15).join('');
+  return base + '-' + stableHash.slice(0, 8);
 }
 
 export default async function handler(req, res) {
