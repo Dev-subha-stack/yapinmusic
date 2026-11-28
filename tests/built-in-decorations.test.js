@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PRESET_DECORATIONS, getBuiltInDecorationImage } from '../src/lib/built-in-decorations.js';
 
-test('built-in decoration catalogue contains the six supported presets', () => {
-  assert.equal(PRESET_DECORATIONS.length, 6);
-  assert.equal(new Set(PRESET_DECORATIONS.map((item) => item.id)).size, 6);
+test('built-in decoration catalogue contains all eight supported presets', () => {
+  assert.equal(PRESET_DECORATIONS.length, 8);
+  assert.equal(new Set(PRESET_DECORATIONS.map((item) => item.id)).size, 8);
   for (const item of PRESET_DECORATIONS) {
     assert.ok(item.id);
     assert.ok(item.name);
@@ -21,7 +21,7 @@ test('each built-in decoration returns a valid transparent SVG data URL', () => 
     assert.match(svg, /<svg\b/);
     assert.match(svg, /viewBox="0 0 512 512"/);
     assert.match(svg, /fill="none"/);
-    assert.match(svg, /<circle cx="256" cy="256" r="194" fill="none"/);
+    assert.match(svg, /<circle cx="256" cy="256" r="190" fill="none"/);
   }
 });
 
