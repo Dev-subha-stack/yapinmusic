@@ -441,3 +441,116 @@
 }
 .community-included-card .community-decor-details h3 { letter-spacing: -.02em; }
 .community-included-card .community-decor-creator { color: var(--accent); font-weight: 700; }
+
+
+/* Admin-only header refinements. Standard users retain the previous header layout. */
+.admin-panel-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--fg);
+  text-decoration: none;
+  font: 750 .82rem var(--f-body, sans-serif);
+  white-space: nowrap;
+  box-shadow: 0 5px 16px -12px var(--accent);
+  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+.admin-panel-shortcut:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 19%, var(--surface));
+}
+.admin-panel-shortcut > span:first-child { font-size: 1rem; line-height: 1; }
+.admin-panel-shortcut[hidden] { display: none !important; }
+
+/* Wide desktop: reserve a real grid track for the admin controls. */
+@media (min-width: 1371px) {
+  .site-head.admin-layout .wrap.top {
+    width: min(calc(100% - 64px), 1760px);
+    max-width: 1760px;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 12px 16px;
+    box-sizing: border-box;
+  }
+  .site-head.admin-layout .brand {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: max-content;
+  }
+  .site-head.admin-layout nav#main-navigation {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: stretch;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    overflow: visible;
+  }
+  .site-head.admin-layout nav#main-navigation a {
+    min-width: 0;
+    padding-inline: clamp(6px, .6vw, 11px);
+    font-size: clamp(.78rem, .82vw, .92rem);
+    white-space: nowrap;
+  }
+  .site-head.admin-layout .head-actions {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    min-width: max-content;
+  }
+}
+
+/* Medium desktop: keep the normal logo/control row and give navigation its own row. */
+@media (min-width: 701px) and (max-width: 1370px) {
+  .site-head.admin-layout .wrap.top {
+    width: min(calc(100% - 40px), 1280px);
+    max-width: 1280px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px 16px;
+    box-sizing: border-box;
+  }
+  .site-head.admin-layout .brand { grid-column: 1; grid-row: 1; }
+  .site-head.admin-layout .head-actions { grid-column: 2; grid-row: 1; }
+  .site-head.admin-layout nav#main-navigation {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow: visible;
+    border-radius: 22px;
+  }
+}
+
+@media (max-width: 700px) {
+  .site-head .admin-panel-shortcut {
+    min-width: 40px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    gap: 0;
+    font-size: 0;
+  }
+  .site-head .admin-panel-shortcut > span:first-child { font-size: 1.05rem; }
+}

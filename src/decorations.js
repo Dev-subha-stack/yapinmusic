@@ -745,7 +745,8 @@ export function createAdminUI() {
 }
 
 export function initPresenceAndAdminLink() {
-  const adminLink = document.querySelector('[data-admin-link]');
+  const adminLink = document.querySelector('[data-admin-panel-button]');
+  const siteHeader = document.querySelector('.site-head');
   let currentUserId = '';
   let isAdmin = false;
   let adminCheckFor = '';
@@ -753,6 +754,7 @@ export function initPresenceAndAdminLink() {
   function setAdminLink(visible) {
     isAdmin = Boolean(visible);
     if (adminLink) adminLink.hidden = !isAdmin;
+    if (siteHeader) siteHeader.classList.toggle('admin-layout', isAdmin);
   }
 
   async function checkAdmin(userId) {
