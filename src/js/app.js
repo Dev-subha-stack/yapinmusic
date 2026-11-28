@@ -5,7 +5,7 @@ import { storage as ls } from '../services/storage.js';
 import {
   getAccountState, subscribeAccount, signUp, signIn, signOut, saveUsername, saveProfileDetails,
   getLeaderboard, getPublicProfile, getPlayerLeaderboardEntry, rankFor, submitScore, isLeaderboardConfigured,
-  getDailyTasks, claimDailyReward
+  getDailyTasks, claimDailyReward, startYapinVerification, completeYapinVerification, unlinkYapinVerification
 } from '../services/leaderboard.js';
 import { compressMediaFile, formatMediaBytes } from '../mediaCompressor.js';
 import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
@@ -1539,10 +1539,46 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       var previewText = el('div', 'profile-preview-text');
       previewText.appendChild(el('strong', 'profile-preview-name', profile.username || accountState.user.name || 'Your player name'));
       previewText.appendChild(el('span', 'profile-preview-rank', (profile.rank_position ? '#' + profile.rank_position + ' · ' : '') + rankFor(profile.total_points || 0).name));
+      if (profile.yapin_verified_at) {
+        previewText.appendChild(el('span', 'yapin-verified-badge', '✓ Yapin verified'));
+      }
       identity.appendChild(previewText);
       preview.appendChild(identity);
       var previewBio = el('p', 'profile-preview-bio', profile.bio || 'Your bio will appear here. Tell the community a little about yourself.');
       preview.appendChild(previewBio);
+
+      var verificationCard = el('section', 'yapin-verification-card');
+      verificationCard.appendChild(el('span', 'yapin-verification-kicker', 'ACCOUNT VERIFICATION'));
+      verificationCard.appendChild(el('strong', 'yapin-verification-title', 'Yapin verification'));
+      var verificationDescription = profile.yapin_verified_at
+        ? 'Connected as @' + (profile.yapin_username || 'Yapin user') + '. Your verified badge is visible on your public profile.'
+        : 'Connect your Yapin account to display a verified badge on your Yapin Music profile and leaderboard.';
+      verificationCard.appendChild(el('p', 'yapin-verification-description', verificationDescription));
+      var verificationAction = el('button', profile.yapin_verified_at ? 'btn' : 'btn primary',
+        profile.yapin_verified_at ? 'Disconnect Yapin' : 'Verify with Yapin');
+      verificationAction.type = 'button';
+      verificationAction.disabled = !accountState.profile;
+      verificationAction.addEventListener('click', async function () {
+        verificationAction.disabled = true;
+        try {
+          if (profile.yapin_verified_at) {
+            if (!window.confirm('Disconnect this Yapin account? Your Yapin Music profile and points will stay unchanged.')) return;
+            await unlinkYapinVerification();
+            toast('Yapin account disconnected.');
+            renderProfile(getAccountState());
+          } else {
+            verificationAction.textContent = 'Opening Yapin…';
+            var authorizationUrl = await startYapinVerification();
+            window.location.assign(authorizationUrl);
+          }
+        } catch (error) {
+          toast(error.message || 'Could not update Yapin verification.');
+          verificationAction.disabled = false;
+          verificationAction.textContent = profile.yapin_verified_at ? 'Disconnect Yapin' : 'Verify with Yapin';
+        }
+      });
+      verificationCard.appendChild(verificationAction);
+      preview.appendChild(verificationCard);
 
       var totalPoints = Math.max(0, Number(profile.total_points) || 0);
       var currentRank = rankFor(totalPoints);
@@ -1870,6 +1906,9 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
         personLink.appendChild(avatar);
         var identity = el('div', 'lb-identity');
         identity.appendChild(el('strong', null, entry.username));
+        if (entry.yapin_verified_at) {
+          identity.appendChild(el('span', 'yapin-verified-badge yapin-verified-badge-small', '✓ Yapin verified'));
+        }
         identity.appendChild(el('small', null, (Number(entry.wins) || 0) + ' wins · ' + (Number(entry.games_played) || 0) + ' games · View profile'));
         personLink.appendChild(identity);
         item.appendChild(personLink);
@@ -1975,7 +2014,15 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       identity.appendChild(avatar);
 
       var nameBlock = el('div', 'public-player-name-block');
-      nameBlock.appendChild(el('h2', null, profile.username || 'Yapin Player'));
+      var nameRow = el('div', 'yapin-name-row');
+      nameRow.appendChild(el('h2', null, profile.username || 'Yapin Player'));
+      if (profile.yapin_verified_at) {
+        nameRow.appendChild(el('span', 'yapin-verified-badge', '✓ Yapin verified'));
+      }
+      nameBlock.appendChild(nameRow);
+      if (profile.yapin_verified_at && profile.yapin_username) {
+        nameBlock.appendChild(el('span', 'yapin-provider-name', 'Yapin · @' + profile.yapin_username));
+      }
       var rank = rankFor(profile.total_points);
       var rankLine = rank.name;
       if (profile.rank_position) rankLine += ' · #' + profile.rank_position + ' on the leaderboard';
@@ -2307,4 +2354,35 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
   window.addEventListener('hashchange', route);
   route();
+
+  async function handleYapinOAuthCallback() {
+    var params = new URLSearchParams(window.location.search);
+    var code = params.get('code');
+    var state = params.get('state');
+    var providerError = params.get('error');
+    if (!code && !state && !providerError) return;
+
+    // Remove the one-time OAuth response from the address bar before any API work.
+    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.hash);
+    if (providerError) {
+      toast(providerError === 'access_denied' ? 'Yapin verification was cancelled.' : 'Yapin could not verify this account. Please try again.');
+      return;
+    }
+    if (!code || !state) {
+      toast('The Yapin verification response was incomplete. Please try again.');
+      return;
+    }
+
+    if (window.location.hash !== '#profile') window.location.hash = '#profile';
+    try {
+      await completeYapinVerification({ code: code, state: state });
+      toast('Yapin verified! Your profile badge is now active.');
+      leaderboardUI.init();
+    } catch (error) {
+      console.warn('Yapin verification could not be completed.', error);
+      toast(error.message || 'Yapin verification failed. Please try again.');
+      leaderboardUI.init();
+    }
+  }
+  handleYapinOAuthCallback();
 })();
