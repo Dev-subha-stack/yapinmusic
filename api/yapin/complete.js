@@ -51,7 +51,7 @@ export default async function handler(req, res) {
 
     const pool = getPool();
     const stateHash = createHash('sha256').update(state).digest('base64url');
-    const claimedState = await pool.query(
+    const claimedState = await client.query(
       `delete from public.yapin_oauth_states
         where state_hash = $1 and flow = 'login' and user_id is null and expires_at > now()
         returning code_verifier`,
@@ -95,9 +95,10 @@ export default async function handler(req, res) {
     const internalEmail = 'yapin-' + stableHash + '@accounts.yapinmusic.invalid';
     const preferredUsername = profileUsername(yapinUser.username, stableHash);
 
-    await pool.query('begin');
+    const client = await pool.connect();
     try {
-      const existing = await pool.query(
+      await client.query('begin');
+      const existing = await client.query(
         `select p.user_id
            from public.player_profiles p
           where p.yapin_user_id = $1
@@ -109,7 +110,7 @@ export default async function handler(req, res) {
       let userId;
       if (existing.rowCount) {
         userId = existing.rows[0].user_id;
-        await pool.query(
+        await client.query(
           `update public.player_profiles
               set yapin_username = $2,
                   yapin_display_name = $3,
@@ -118,7 +119,7 @@ export default async function handler(req, res) {
           [userId, yapinUser.username, yapinUser.displayName]
         );
       } else {
-        const createdUser = await pool.query(
+        const createdUser = await client.query(
           `insert into neon_auth."user" ("name", "email", "emailVerified", "createdAt", "updatedAt")
            values ($1, $2, false, now(), now())
            on conflict ("email") do update
@@ -129,7 +130,7 @@ export default async function handler(req, res) {
         );
         userId = createdUser.rows[0].id;
 
-        await pool.query(
+        await client.query(
           `insert into public.player_profiles
              (user_id, username, yapin_user_id, yapin_username, yapin_display_name, yapin_verified_at)
            values ($1, $2, $3, $4, $5, now())
@@ -143,7 +144,7 @@ export default async function handler(req, res) {
         );
       }
 
-      const profileResult = await pool.query(
+      const profileResult = await client.query(
         `select p.user_id, p.username, p.bio, p.avatar_url, p.banner_url,
                 coalesce(l.total_points, 0)::integer as total_points,
                 coalesce(l.wins, 0)::integer as wins,
@@ -155,8 +156,6 @@ export default async function handler(req, res) {
           limit 1`,
         [userId]
       );
-      await pool.query('commit');
-
       const secret = String(process.env.YAPIN_SESSION_SECRET || '');
       if (secret.length < 48) throw new Error('The Yapin session signing secret is not configured.');
       const sessionToken = await new SignJWT({
@@ -171,6 +170,7 @@ export default async function handler(req, res) {
         .setIssuedAt()
         .setExpirationTime('30d')
         .sign(new TextEncoder().encode(secret));
+      await client.query('commit');
 
       res.setHeader('Set-Cookie',
         'yapinmusic_session=' + sessionToken + '; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000'
@@ -188,8 +188,10 @@ export default async function handler(req, res) {
         profile: profileResult.rows[0] || null
       });
     } catch (error) {
-      await pool.query('rollback');
+      await client.query('rollback').catch(() => {});
       throw error;
+    } finally {
+      client.release();
     }
   } catch (error) {
     return sendApiError(res, error);
