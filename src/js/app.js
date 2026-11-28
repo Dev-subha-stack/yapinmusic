@@ -2107,8 +2107,8 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
           try {
             var parsed = new URL(String(url || ''));
             if (parsed.protocol !== 'https:' || parsed.hostname !== 'open.spotify.com') return null;
-            if (!/^\\/(?:track|playlist)\\/[A-Za-z0-9]+\\/?$/.test(parsed.pathname)) return null;
-            return parsed.origin + parsed.pathname.replace(/\\/$/, '');
+            if (!/^\/(?:track|playlist)\\/[A-Za-z0-9]+\\/?$/.test(parsed.pathname)) return null;
+            return parsed.origin + parsed.pathname.replace(/\/$/, '');
           } catch (error) { return null; }
         }
         function appendMusicItem(parent, title, subtitle, url, linkLabel) {
