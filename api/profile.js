@@ -12,6 +12,21 @@ function validBio(value) {
   return bio;
 }
 
+function validTagline(value) {
+  const tagline = String(value || '').trim();
+  return tagline.length <= 60 ? tagline : null;
+}
+
+function validAccentColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : null;
+}
+
+function validChoice(value, choices) {
+  const choice = String(value || '').trim();
+  return choices.includes(choice) ? choice : null;
+}
+
 function validImageData(value, maxLength) {
   if (value == null || value === '') return null;
   const image = String(value).trim();
@@ -23,7 +38,8 @@ function validImageData(value, maxLength) {
 
 async function readProfile(pool, userId) {
   const { rows } = await pool.query(
-    `select p.user_id, p.username, p.bio, p.avatar_url, p.banner_url,
+    `select p.user_id, p.username, p.bio, p.tagline, p.avatar_url, p.banner_url,
+            p.accent_color, p.card_style, p.avatar_shape, p.profile_effect,
             p.yapin_username,
             coalesce(l.total_points, 0)::integer as total_points,
             coalesce(l.wins, 0)::integer as wins,
@@ -59,24 +75,47 @@ export default async function handler(req, res) {
       });
     }
     const bio = validBio(body.bio);
+    const hasTagline = Object.prototype.hasOwnProperty.call(body, 'tagline');
+    const hasAccentColor = Object.prototype.hasOwnProperty.call(body, 'accentColor');
+    const hasCardStyle = Object.prototype.hasOwnProperty.call(body, 'cardStyle');
+    const hasAvatarShape = Object.prototype.hasOwnProperty.call(body, 'avatarShape');
+    const hasProfileEffect = Object.prototype.hasOwnProperty.call(body, 'profileEffect');
+    const tagline = hasTagline ? validTagline(body.tagline) : null;
+    const accentColor = hasAccentColor ? validAccentColor(body.accentColor) : null;
+    const cardStyle = hasCardStyle ? validChoice(body.cardStyle, ['classic', 'sunset', 'ocean', 'aurora', 'midnight']) : null;
+    const avatarShape = hasAvatarShape ? validChoice(body.avatarShape, ['circle', 'rounded', 'square']) : null;
+    const profileEffect = hasProfileEffect ? validChoice(body.profileEffect, ['none', 'glow', 'shimmer']) : null;
     const hasAvatar = Object.prototype.hasOwnProperty.call(body, 'avatarData');
     const hasBanner = Object.prototype.hasOwnProperty.call(body, 'bannerData');
     const avatarData = hasAvatar ? validImageData(body.avatarData, 1400000) : null;
     const bannerData = hasBanner ? validImageData(body.bannerData, 1850000) : null;
     if (bio == null) return res.status(400).json({ error: 'Your bio must be 160 characters or fewer.' });
+    if (hasTagline && tagline == null) return res.status(400).json({ error: 'Your one-line status must be 60 characters or fewer.' });
+    if (hasAccentColor && accentColor == null) return res.status(400).json({ error: 'Choose a valid profile accent colour.' });
+    if (hasCardStyle && cardStyle == null) return res.status(400).json({ error: 'Choose one of the available profile themes.' });
+    if (hasAvatarShape && avatarShape == null) return res.status(400).json({ error: 'Choose one of the available avatar shapes.' });
+    if (hasProfileEffect && profileEffect == null) return res.status(400).json({ error: 'Choose one of the available profile effects.' });
     if (hasAvatar && body.avatarData && !avatarData) return res.status(400).json({ error: 'The profile photo could not be processed. Choose a JPG, PNG, WebP or GIF image and try again.' });
     if (hasBanner && body.bannerData && !bannerData) return res.status(400).json({ error: 'The banner could not be processed. Choose a JPG, PNG, WebP or GIF image and try again.' });
 
     await pool.query(
-      `insert into public.player_profiles (user_id, username, bio, avatar_url, banner_url)
-       values ($1, $2, $3, $4, $5)
+      `insert into public.player_profiles
+         (user_id, username, bio, avatar_url, banner_url, tagline, accent_color, card_style, avatar_shape, profile_effect)
+       values
+         ($1, $2, $3, $4, $5, coalesce($6, ''), coalesce($7, '#FF6B35'),
+          coalesce($8, 'classic'), coalesce($9, 'rounded'), coalesce($10, 'none'))
        on conflict (user_id) do update
          set username = excluded.username,
              bio = excluded.bio,
              avatar_url = coalesce(excluded.avatar_url, public.player_profiles.avatar_url),
              banner_url = coalesce(excluded.banner_url, public.player_profiles.banner_url),
+             tagline = coalesce($6, public.player_profiles.tagline),
+             accent_color = coalesce($7, public.player_profiles.accent_color),
+             card_style = coalesce($8, public.player_profiles.card_style),
+             avatar_shape = coalesce($9, public.player_profiles.avatar_shape),
+             profile_effect = coalesce($10, public.player_profiles.profile_effect),
              updated_at = now()`,
-      [userId, username, bio, avatarData, bannerData]
+      [userId, username, bio, avatarData, bannerData, tagline, accentColor, cardStyle, avatarShape, profileEffect]
     );
     return res.status(200).json({ profile: await readProfile(pool, userId) });
   } catch (error) {
