@@ -1922,9 +1922,6 @@ body.player-profile-open { overflow:hidden; }
 .public-player-card .public-player-stat span { color:var(--profile-card-muted); }
 .profile-preview .profile-points-kicker,
 .profile-preview .profile-editor-heading,
-.public-player-card .public-player-rank { --profile-accent:var(--profile-accent); }
-.profile-preview .profile-points-kicker,
-.profile-preview .profile-editor-heading,
 .profile-preview .profile-points-track span { color:var(--profile-accent); }
 .profile-preview .profile-points-track span { background:var(--profile-accent); }
 .profile-preview .profile-points-card,
