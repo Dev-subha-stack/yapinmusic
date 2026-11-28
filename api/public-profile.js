@@ -15,7 +15,8 @@ export default async function handler(req, res) {
 
   try {
     const { rows } = await getPool().query(
-      `select p.user_id, p.username, p.bio, p.avatar_url, p.banner_url,
+      `select p.user_id, p.username, p.bio, p.tagline, p.avatar_url, p.banner_url,
+              p.accent_color, p.card_style, p.avatar_shape, p.profile_effect,
               coalesce(l.total_points, 0)::integer as total_points,
               coalesce(l.wins, 0)::integer as wins,
               coalesce(l.games_played, 0)::integer as games_played,
