@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         [userId, decorationId, 'approved']
       );
       const dataUrl = imageResult.rows[0] && String(imageResult.rows[0].image_data || '');
-      const match = /^data:image\\/(png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(dataUrl);
+      const match = /^data:image\/(png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(dataUrl);
       if (!match) return res.status(404).json({ error: 'This player has no active public decoration.' });
       const image = Buffer.from(match[2], 'base64');
       if (!image.length || image.length > 270000) {
