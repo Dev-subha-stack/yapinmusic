@@ -244,12 +244,32 @@ export async function signIn({ email, password }) {
   return currentUser;
 }
 
-export async function saveProfileDetails({ username, bio = '', avatarData = null, bannerData = null }) {
+export async function saveProfileDetails({
+  username,
+  bio = '',
+  tagline = currentProfile?.tagline || '',
+  accentColor = currentProfile?.accent_color || '#FF6B35',
+  cardStyle = currentProfile?.card_style || 'classic',
+  avatarShape = currentProfile?.avatar_shape || 'rounded',
+  profileEffect = currentProfile?.profile_effect || 'none',
+  avatarData = null,
+  bannerData = null
+}) {
   if (!authClient || !currentSession) throw new Error('Sign in before editing your player profile.');
   const cleanUsername = validateUsername(username);
   const cleanBio = String(bio || '').trim();
+  const cleanTagline = String(tagline || '').trim();
   if (cleanBio.length > 160) throw new Error('Your bio must be 160 characters or fewer.');
-  const payload = { username: cleanUsername, bio: cleanBio };
+  if (cleanTagline.length > 60) throw new Error('Your one-line status must be 60 characters or fewer.');
+  const payload = {
+    username: cleanUsername,
+    bio: cleanBio,
+    tagline: cleanTagline,
+    accentColor,
+    cardStyle,
+    avatarShape,
+    profileEffect
+  };
   if (avatarData) payload.avatarData = avatarData;
   if (bannerData) payload.bannerData = bannerData;
   const result = await apiRequest('/api/profile', {
