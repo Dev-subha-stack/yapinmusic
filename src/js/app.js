@@ -1840,7 +1840,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       favoriteTracksInput.placeholder = 'Song title | Artist | Spotify track link';
       favoriteTracksInput.value = (musicProfile.favoriteTracks || []).map(function (track) {
         return [track.title, track.artist, track.url].join(' | ');
-      }).join('\\n');
+      }).join('\n');
       favoriteTracksLabel.appendChild(favoriteTracksInput);
       musicEditor.appendChild(favoriteTracksLabel);
 
@@ -1852,7 +1852,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       playlistsInput.placeholder = 'Playlist name | Spotify playlist link';
       playlistsInput.value = (musicProfile.playlists || []).map(function (playlist) {
         return [playlist.title, playlist.url].join(' | ');
-      }).join('\\n');
+      }).join('\n');
       playlistsLabel.appendChild(playlistsInput);
       musicEditor.appendChild(playlistsLabel);
 
@@ -1873,7 +1873,7 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
       musicEditor.appendChild(musicActions);
 
       function parseMusicLines(value, withArtist) {
-        return String(value || '').split('\\n').map(function (line) {
+        return String(value || '').split('\n').map(function (line) {
           return line.trim();
         }).filter(Boolean).map(function (line) {
           var parts = line.split('|').map(function (part) { return part.trim(); });
