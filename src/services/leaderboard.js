@@ -37,10 +37,14 @@ async function apiRequest(path, options = {}, tokenRequired = true) {
   const headers = new Headers(options.headers || {});
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (tokenRequired) {
-    const session = currentSession || await readSession();
-    const token = session && session.token;
-    if (!token) throw new Error('Sign in to use your player account.');
-    headers.set('Authorization', 'Bearer ' + token);
+    let session = currentSession || await readSession();
+    if (!session) session = await readYapinSession();
+    if (!session) throw new Error('Sign in to use your player account.');
+    if (session.provider !== 'yapin') {
+      const token = session.token;
+      if (!token) throw new Error('Sign in to use your player account.');
+      headers.set('Authorization', 'Bearer ' + token);
+    }
   }
   const response = await fetch(path, {
     ...options,
@@ -76,6 +80,32 @@ async function loadProfile() {
   return currentProfile;
 }
 
+async function readYapinSession() {
+  const response = await fetch('/api/yapin/session', {
+    method: 'GET',
+    credentials: 'same-origin',
+    cache: 'no-store'
+  });
+  const body = await response.json().catch(() => ({}));
+  if (response.status === 401 || response.status === 404) return null;
+  if (!response.ok || !body.user) {
+    throw new Error(apiErrorMessage(body, 'Could not restore your Yapin session.'));
+  }
+  currentSession = { provider: 'yapin', token: null };
+  currentUser = body.user;
+  currentProfile = body.profile || null;
+  return currentSession;
+}
+
+async function clearYapinSession() {
+  const response = await fetch('/api/yapin/logout', {
+    method: 'POST',
+    credentials: 'same-origin',
+    cache: 'no-store'
+  });
+  if (!response.ok) throw new Error('Could not end the Yapin session.');
+}
+
 async function refreshAccountState(options = {}) {
   if (!authClient) {
     authLoading = false;
@@ -104,13 +134,18 @@ async function refreshAccountState(options = {}) {
 
     let shouldNotify = !silent || !hadAccount;
     try {
-      await readSession();
+      try {
+        await readSession();
+      } catch (neonError) {
+        const yapinSession = await readYapinSession().catch(() => null);
+        if (!yapinSession) throw neonError;
+      }
+      if (!currentSession || !currentUser) await readYapinSession();
       if (currentSession && currentUser) {
-        // Keep the current profile object during a passive refresh for the same user.
-        // The token may refresh, but the open editor and its selected File objects stay intact.
+        // Keep the current profile object during passive refreshes for the same user.
         if (!silent || !hadAccount || previousUserId !== currentUser.id) {
-          await loadProfile();
-        } else {
+          if (currentSession.provider !== 'yapin') await loadProfile();
+        } else if (currentSession.provider !== 'yapin') {
           currentProfile = previousProfile;
         }
       } else {
@@ -179,6 +214,7 @@ function validateUsername(value) {
 
 export async function signUp({ email, password, username }) {
   if (!authClient) throw new Error('Neon Auth is not configured on this site yet.');
+  if (currentSession && currentSession.provider === 'yapin') await clearYapinSession();
   const cleanName = validateUsername(username);
   const result = await authClient.signUp.email({
     name: cleanName,
@@ -195,6 +231,7 @@ export async function signUp({ email, password, username }) {
 
 export async function signIn({ email, password }) {
   if (!authClient) throw new Error('Neon Auth is not configured on this site yet.');
+  if (currentSession && currentSession.provider === 'yapin') await clearYapinSession();
   const result = await authClient.signIn.email({
     email: String(email || '').trim(),
     password
@@ -232,52 +269,45 @@ export async function saveUsername(value) {
   });
 }
 
-export async function startYapinVerification() {
-  if (!authClient || !currentSession) throw new Error('Sign in to Yapin Music before verifying your Yapin account.');
-  const result = await apiRequest('/api/yapin/start', {
+export async function startYapinLogin() {
+  const response = await fetch('/api/yapin/start', {
     method: 'POST',
-    body: JSON.stringify({})
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+    credentials: 'same-origin',
+    cache: 'no-store'
   });
-  if (!result.authorizationUrl) throw new Error('Yapin did not return a verification link.');
-  return result.authorizationUrl;
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body.authorizationUrl) {
+    throw new Error(apiErrorMessage(body, 'Could not start Yapin sign-in.'));
+  }
+  return body.authorizationUrl;
 }
 
-export async function completeYapinVerification({ code, state } = {}) {
-  if (!authClient || !currentSession) throw new Error('Sign in to Yapin Music before completing verification.');
+export async function completeYapinLogin({ code, state } = {}) {
   const result = await apiRequest('/api/yapin/complete', {
     method: 'POST',
     body: JSON.stringify({ code, state })
-  });
-  try {
-    await loadProfile();
-  } catch {
-    currentProfile = { ...(currentProfile || {}), ...(result.profile || {}) };
-  }
+  }, false);
+  if (!result.signedIn || !result.user) throw new Error('Yapin did not complete sign-in.');
+  currentSession = { provider: 'yapin', token: null };
+  currentUser = result.user;
+  currentProfile = result.profile || null;
   accountError = null;
-  notifyAccount();
-  return currentProfile;
-}
-
-export async function unlinkYapinVerification() {
-  if (!authClient || !currentSession) throw new Error('Sign in to Yapin Music before disconnecting Yapin.');
-  await apiRequest('/api/yapin/unlink', {
-    method: 'POST',
-    body: JSON.stringify({})
-  });
-  currentProfile = {
-    ...(currentProfile || {}),
-    yapin_username: null,
-    yapin_display_name: null,
-    yapin_verified_at: null
-  };
+  authLoading = false;
   notifyAccount();
   return currentProfile;
 }
 
 export async function signOut() {
   if (!authClient) return;
-  const result = await authClient.signOut();
-  if (result.error) throw result.error;
+  if (currentSession && currentSession.provider === 'yapin') {
+    await clearYapinSession();
+  } else {
+    const result = await authClient.signOut();
+    if (result.error) throw result.error;
+    await clearYapinSession().catch(() => {});
+  }
   currentSession = null;
   currentUser = null;
   currentProfile = null;
