@@ -132,13 +132,12 @@ export default async function handler(req, res) {
 
         await client.query(
           `insert into public.player_profiles
-             (user_id, username, yapin_user_id, yapin_username, yapin_display_name, yapin_verified_at)
-           values ($1, $2, $3, $4, $5, now())
+             (user_id, username, yapin_user_id, yapin_username, yapin_display_name)
+           values ($1, $2, $3, $4, $5)
            on conflict (user_id) do update
              set yapin_user_id = excluded.yapin_user_id,
                  yapin_username = excluded.yapin_username,
                  yapin_display_name = excluded.yapin_display_name,
-                 yapin_verified_at = now(),
                  updated_at = now()`,
           [userId, preferredUsername, yapinUser.id, yapinUser.username, yapinUser.displayName]
         );
