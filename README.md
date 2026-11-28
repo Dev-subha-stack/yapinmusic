@@ -106,6 +106,12 @@ For local development, copy `.env.example` to `.env.local` and fill in `DATABASE
 - `POST /api/submit-score`: verifies the Neon Auth JWT and records one Daily result
 
 
+## My Music profile section
+
+Signed-in players can add a manually updated recent listen, up to five favourite songs, and up to five favourite playlists to their player card. They choose whether the section appears on their public profile. Entries are user-entered labels and Spotify share links only; Yapin Music does not connect to Spotify, access listening history, fetch Spotify metadata, embed Spotify content, or play audio. Spotify links open on Spotify.
+
+Apply `neon/migrations/20261128000000_player_music.sql` before deploying the new API route.
+
 ## Development notes
 
 - The original game rules, catalog, daily/random selection, and local stats are preserved.
