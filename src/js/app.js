@@ -1437,18 +1437,34 @@ import { key, bandKey, sortLetter, lookup } from '../lib/normalize.js';
 
       if (!accountState.user) {
         profileBox.appendChild(el('p', 'lb-muted', 'Sign in with Yapin or use your email and password. You can keep playing as a guest without an account.'));
-        var yapinLogin = el('button', 'btn yapin-login-button', 'Continue with Yapin');
+        var yapinLogin = el('button', 'btn yapin-login-button');
         yapinLogin.type = 'button';
+        var yapinLogo = el('img', 'yapin-login-logo');
+        yapinLogo.src = 'https://www.yapin.gg/favicon.ico';
+        yapinLogo.alt = '';
+        yapinLogo.setAttribute('aria-hidden', 'true');
+        yapinLogo.decoding = 'async';
+        yapinLogo.onerror = function () {
+          if (!yapinLogo.dataset.fallback) {
+            yapinLogo.dataset.fallback = 'true';
+            yapinLogo.src = 'https://www.google.com/s2/favicons?domain=yapin.gg&sz=64';
+          } else {
+            yapinLogo.hidden = true;
+          }
+        };
+        var yapinLoginLabel = el('span', null, 'Continue with Yapin');
+        yapinLogin.appendChild(yapinLogo);
+        yapinLogin.appendChild(yapinLoginLabel);
         yapinLogin.addEventListener('click', async function () {
           yapinLogin.disabled = true;
-          yapinLogin.textContent = 'Opening Yapin…';
+          yapinLoginLabel.textContent = 'Opening Yapin…';
           try {
             var authorizationUrl = await startYapinLogin();
             window.location.assign(authorizationUrl);
           } catch (error) {
             toast(error.message || 'Could not start Yapin sign-in.');
             yapinLogin.disabled = false;
-            yapinLogin.textContent = 'Continue with Yapin';
+            yapinLoginLabel.textContent = 'Continue with Yapin';
           }
         });
         profileBox.appendChild(yapinLogin);
