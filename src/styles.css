@@ -1804,6 +1804,10 @@ body.player-profile-open { overflow:hidden; }
 
 /* ===== Alternative Yapin login option ===== */
 .yapin-login-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
   width: 100%;
   min-height: 48px;
   border: 1px solid var(--accent);
@@ -1834,3 +1838,15 @@ body.player-profile-open { overflow:hidden; }
   flex: 1;
   background: var(--line);
 }
+
+.yapin-login-logo {
+  display: block;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #fff;
+  padding: 2px;
+}
+.yapin-login-logo[hidden] { display: none; }
