@@ -232,6 +232,44 @@ export async function saveUsername(value) {
   });
 }
 
+export async function startYapinVerification() {
+  if (!authClient || !currentSession) throw new Error('Sign in to Yapin Music before verifying your Yapin account.');
+  const result = await apiRequest('/api/yapin/start', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+  if (!result.authorizationUrl) throw new Error('Yapin did not return a verification link.');
+  return result.authorizationUrl;
+}
+
+export async function completeYapinVerification({ code, state } = {}) {
+  if (!authClient || !currentSession) throw new Error('Sign in to Yapin Music before completing verification.');
+  const result = await apiRequest('/api/yapin/complete', {
+    method: 'POST',
+    body: JSON.stringify({ code, state })
+  });
+  currentProfile = { ...(currentProfile || {}), ...(result.profile || {}) };
+  accountError = null;
+  notifyAccount();
+  return currentProfile;
+}
+
+export async function unlinkYapinVerification() {
+  if (!authClient || !currentSession) throw new Error('Sign in to Yapin Music before disconnecting Yapin.');
+  await apiRequest('/api/yapin/unlink', {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+  currentProfile = {
+    ...(currentProfile || {}),
+    yapin_username: null,
+    yapin_display_name: null,
+    yapin_verified_at: null
+  };
+  notifyAccount();
+  return currentProfile;
+}
+
 export async function signOut() {
   if (!authClient) return;
   const result = await authClient.signOut();
