@@ -3,8 +3,7 @@
 alter table public.player_profiles
   add column if not exists yapin_user_id text,
   add column if not exists yapin_username text,
-  add column if not exists yapin_display_name text,
-  add column if not exists yapin_verified_at timestamptz;
+  add column if not exists yapin_display_name text;
 
 alter table public.player_profiles
   alter column yapin_user_id type text using yapin_user_id::text;
