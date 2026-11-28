@@ -554,3 +554,77 @@
   }
   .site-head .admin-panel-shortcut > span:first-child { font-size: 1.05rem; }
 }
+
+
+/* Premium included decoration cards */
+.community-included-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 18px;
+}
+.community-included-card {
+  position: relative;
+  grid-template-columns: 142px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+  border-color: color-mix(in srgb, var(--preset-accent, var(--accent)) 28%, var(--line));
+  background:
+    radial-gradient(ellipse at 0% 0%, color-mix(in srgb, var(--preset-accent, var(--accent)) 14%, transparent), transparent 66%),
+    linear-gradient(145deg, color-mix(in srgb, var(--preset-accent, var(--accent)) 5%, var(--surface)), var(--surface) 58%);
+  box-shadow: 0 10px 28px -22px color-mix(in srgb, var(--preset-accent, var(--accent)) 70%, transparent);
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.community-included-card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--preset-accent, var(--accent)) 60%, var(--line));
+  box-shadow: 0 18px 34px -24px color-mix(in srgb, var(--preset-accent, var(--accent)) 85%, transparent);
+}
+.community-included-card .community-decor-image-frame {
+  width: 142px;
+  border: 1px solid color-mix(in srgb, var(--preset-accent, var(--accent)) 30%, var(--line));
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--preset-accent, var(--accent)) 19%, var(--hover)), var(--hover) 72%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 28%), 0 8px 18px -15px var(--preset-accent);
+}
+.community-included-card .community-decor-image {
+  filter: drop-shadow(0 7px 12px color-mix(in srgb, var(--preset-accent, var(--accent)) 25%, transparent));
+  transition: transform .22s ease;
+}
+.community-included-card:hover .community-decor-image {
+  transform: scale(1.055) rotate(-2deg);
+}
+.community-included-card .community-decor-details h3 {
+  font-size: 1.17rem;
+  letter-spacing: -.035em;
+}
+.community-included-card .community-decor-creator {
+  color: var(--preset-accent, var(--accent));
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+.community-included-card .community-decor-meta { line-height: 1.5; }
+.community-included-card .community-decor-actions .btn.primary {
+  border-color: color-mix(in srgb, var(--preset-accent, var(--accent)) 58%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--preset-accent, var(--accent)) 90%, #fff), var(--preset-accent, var(--accent)));
+  color: #17151b;
+  box-shadow: 0 6px 16px -12px var(--preset-accent);
+}
+.community-included-card .community-decor-actions .btn.primary:hover { filter: brightness(1.06); }
+@media (max-width: 560px) {
+  .community-included-card {
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 13px;
+    padding: 13px;
+  }
+  .community-included-card .community-decor-image-frame {
+    width: 104px;
+    border-radius: 17px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .community-included-card,
+  .community-included-card .community-decor-image { transition: none; }
+  .community-included-card:hover { transform: none; }
+}
