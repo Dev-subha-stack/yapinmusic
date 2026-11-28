@@ -554,3 +554,42 @@
   .community-included-card .community-decor-image { transition: none; }
   .community-included-card:hover { transform: none; }
 }
+
+
+/* Public list avatars also display equipped decorations. */
+.lb-row-avatar.has-avatar-decoration,
+.member-avatar-frame.has-avatar-decoration {
+  position: relative;
+  overflow: visible !important;
+  isolation: isolate;
+}
+.lb-row-avatar.has-avatar-decoration {
+  z-index: 1;
+}
+.member-avatar-frame {
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  overflow: visible;
+  isolation: isolate;
+}
+.member-avatar-frame > img:not(.profile-decoration-overlay) {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.member-avatar-frame > img.profile-decoration-overlay {
+  position: absolute !important;
+  inset: -15% !important;
+  width: 130% !important;
+  height: 130% !important;
+  max-width: none !important;
+  object-fit: contain !important;
+  border-radius: 0 !important;
+  z-index: 4 !important;
+  pointer-events: none;
+}
