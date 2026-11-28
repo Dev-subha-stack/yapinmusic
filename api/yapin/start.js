@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { getPool } from '../_lib/db.js';
-import { requireNeonUser, sendApiError } from '../_lib/auth.js';
+import { sendApiError } from '../_lib/auth.js';
 
 const CLIENT_ID = '6dd7023b-622a-4fbe-a730-fec0637bbee3';
 const REDIRECT_URI = 'https://yapinmusic.vercel.app/';
@@ -17,25 +17,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId } = await requireNeonUser(req);
-    const pool = getPool();
-    const profile = await pool.query(
-      'select 1 from public.player_profiles where user_id = $1 limit 1',
-      [userId]
-    );
-    if (!profile.rowCount) {
-      return res.status(409).json({ error: 'Create your Yapin Music player profile before linking Yapin.' });
-    }
-
     const state = base64url(randomBytes(32));
     const codeVerifier = base64url(randomBytes(48));
     const codeChallenge = base64url(createHash('sha256').update(codeVerifier).digest());
 
+    const pool = getPool();
     await pool.query('delete from public.yapin_oauth_states where expires_at <= now()');
     await pool.query(
-      `insert into public.yapin_oauth_states (state_hash, user_id, code_verifier, expires_at)
-       values ($1, $2, $3, now() + interval '10 minutes')`,
-      [createHash('sha256').update(state).digest('base64url'), userId, codeVerifier]
+      `insert into public.yapin_oauth_states (state_hash, user_id, code_verifier, expires_at, flow)
+       values ($1, null, $2, now() + interval '10 minutes', 'login')`,
+      [createHash('sha256').update(state).digest('base64url'), codeVerifier]
     );
 
     const authorize = new URL('https://www.yapin.gg/oauth/authorize');
